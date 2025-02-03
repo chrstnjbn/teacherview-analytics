@@ -9,13 +9,12 @@ const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignIn = (e: React.FormEvent, role: 'teacher' | 'admin') => {
     e.preventDefault();
     setIsLoading(true);
-    // Implement sign in logic here
     toast({
       title: "Coming Soon",
-      description: "Sign in functionality will be implemented soon.",
+      description: `${role === 'admin' ? 'Administrator' : 'Teacher'} sign in functionality will be implemented soon.`,
     });
     setIsLoading(false);
   };
@@ -23,7 +22,6 @@ const TeacherAuth = () => {
   const handleSignUp = (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Implement sign up logic here
     toast({
       title: "Coming Soon",
       description: "Sign up functionality will be implemented soon.",
@@ -35,24 +33,35 @@ const TeacherAuth = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-md mx-auto">
         <Card className="p-6">
-          <Tabs defaultValue="signin" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Sign In</TabsTrigger>
+          <Tabs defaultValue="teacher" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="teacher">Teacher</TabsTrigger>
+              <TabsTrigger value="admin">Administrator</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+            <TabsContent value="teacher">
+              <form onSubmit={(e) => handleSignIn(e, 'teacher')} className="space-y-4">
                 <Input type="email" placeholder="Email" required />
                 <Input type="password" placeholder="Password" required />
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  Sign In
+                  Sign In as Teacher
                 </Button>
                 <div className="text-center">
                   <Button variant="outline" className="w-full mt-2">
                     Continue with Google
                   </Button>
                 </div>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="admin">
+              <form onSubmit={(e) => handleSignIn(e, 'admin')} className="space-y-4">
+                <Input type="email" placeholder="Admin Email" required />
+                <Input type="password" placeholder="Admin Password" required />
+                <Button type="submit" className="w-full" disabled={isLoading}>
+                  Sign In as Administrator
+                </Button>
               </form>
             </TabsContent>
 
