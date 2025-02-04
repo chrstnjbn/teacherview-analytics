@@ -4,10 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
+import { auth, googleProvider } from "@/lib/firebase";
+import { signInWithPopup } from "firebase/auth";
+import { useNavigate } from "react-router-dom";
 
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleSignIn = (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,6 +33,29 @@ const TeacherAuth = () => {
     setIsLoading(false);
   };
 
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsLoading(true);
+      const result = await signInWithPopup(auth, googleProvider);
+      toast({
+        title: "Success!",
+        description: "Successfully signed in with Google.",
+      });
+      // You can handle the successful sign-in here, e.g., store user data
+      console.log("Google Sign In Success:", result.user);
+      navigate("/teacher/dashboard"); // Redirect to teacher dashboard after successful sign-in
+    } catch (error) {
+      console.error("Google Sign In Error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to sign in with Google. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-md mx-auto">
@@ -47,7 +74,13 @@ const TeacherAuth = () => {
                   Sign In
                 </Button>
                 <div className="text-center">
-                  <Button variant="outline" className="w-full mt-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-2"
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoading}
+                    type="button"
+                  >
                     Continue with Google
                   </Button>
                 </div>
@@ -66,7 +99,13 @@ const TeacherAuth = () => {
                   Sign Up
                 </Button>
                 <div className="text-center">
-                  <Button variant="outline" className="w-full mt-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-2"
+                    onClick={handleGoogleSignIn}
+                    disabled={isLoading}
+                    type="button"
+                  >
                     Sign up with Google
                   </Button>
                 </div>
