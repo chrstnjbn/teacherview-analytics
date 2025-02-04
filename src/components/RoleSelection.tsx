@@ -6,7 +6,7 @@ export const RoleSelection = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto p-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto p-4">
       <Card className="p-6 hover:shadow-lg transition-shadow animate-fadeIn">
         <h2 className="text-2xl font-bold text-primary mb-4">For Students</h2>
         <p className="text-gray-600 mb-6">
@@ -30,6 +30,19 @@ export const RoleSelection = () => {
           onClick={() => navigate("/teacher/login")}
         >
           Teacher Login
+        </Button>
+      </Card>
+
+      <Card className="p-6 hover:shadow-lg transition-shadow animate-fadeIn">
+        <h2 className="text-2xl font-bold text-primary mb-4">For Administrators</h2>
+        <p className="text-gray-600 mb-6">
+          Manage system settings, oversee user accounts, and monitor performance analytics.
+        </p>
+        <Button 
+          className="w-full bg-primary hover:bg-primary/90"
+          onClick={() => navigate("/admin/login")}
+        >
+          Administrator Login
         </Button>
       </Card>
     </div>
