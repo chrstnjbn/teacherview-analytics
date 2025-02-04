@@ -11,6 +11,15 @@ const firebaseConfig = {
   measurementId: "G-8J0EL5RHCC"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize Auth with specific settings
 export const auth = getAuth(app);
+auth.useDeviceLanguage(); // Use the device's language
+
+// Initialize Google Auth Provider with custom parameters
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account' // Always prompt for account selection
+});
