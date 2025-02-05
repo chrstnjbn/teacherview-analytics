@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import StudentEntry from "./pages/StudentEntry";
 import TeacherAuth from "./pages/TeacherAuth";
+import TeacherProfileForm from "./pages/TeacherProfileForm";
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/student" element={<StudentEntry />} />
             <Route path="/teacher/login" element={<TeacherAuth />} />
+            <Route path="/teacher/profile" element={<TeacherProfileForm />} />
             <Route path="/admin/login" element={<TeacherAuth />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

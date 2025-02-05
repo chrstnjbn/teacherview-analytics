@@ -50,14 +50,13 @@ const TeacherAuth = () => {
           email: result.user.email,
           displayName: result.user.displayName,
         }));
-        navigate("/teacher/dashboard");
+        navigate("/teacher/profile"); // Changed to redirect to profile form
       }
     } catch (error) {
       console.error("Google Sign In Error:", error);
       if (error instanceof Error) {
         let errorMessage = "Failed to sign in with Google. Please try again.";
         
-        // Handle specific Firebase Auth errors
         if (error.message.includes('popup-closed-by-user')) {
           errorMessage = "Sign-in cancelled. Please try again.";
         } else if (error.message.includes('auth/network-request-failed')) {
