@@ -26,7 +26,6 @@ const StudentEntry = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get teacher information from localStorage
     const storedTeacherInfo = localStorage.getItem('teacherProfile');
     if (storedTeacherInfo) {
       const teacherData = JSON.parse(storedTeacherInfo);
@@ -40,7 +39,7 @@ const StudentEntry = () => {
       sessionStorage.setItem("studentName", name.trim());
       toast({
         title: "Welcome!",
-        description: "You can now provide feedback.",
+        description: "You can now provide feedback for teachers.",
       });
       navigate("/student/feedback");
     }
