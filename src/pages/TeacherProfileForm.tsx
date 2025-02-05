@@ -29,6 +29,10 @@ const TeacherProfileForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Get user data from localStorage
+  const userData = localStorage.getItem('user');
+  const user = userData ? JSON.parse(userData) : null;
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -43,8 +47,12 @@ const TeacherProfileForm = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      // Here you would typically save the data to your backend
-      console.log("Form values:", values);
+      // Store teacher profile data
+      const profileData = {
+        ...values,
+        displayName: user?.displayName || 'Teacher',
+      };
+      localStorage.setItem('teacherProfile', JSON.stringify(profileData));
       
       toast({
         title: "Profile Updated",
@@ -67,7 +75,9 @@ const TeacherProfileForm = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">Complete Your Teacher Profile</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">
+            Welcome {user?.displayName || 'Teacher'}, Complete Your Profile
+          </h1>
           
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

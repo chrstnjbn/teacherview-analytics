@@ -40,17 +40,18 @@ const TeacherAuth = () => {
       const credential = GoogleAuthProvider.credentialFromResult(result);
       
       if (credential) {
+        const userName = result.user.displayName || 'Teacher';
         toast({
-          title: "Success!",
-          description: `Welcome ${result.user.displayName || 'Teacher'}!`,
+          title: `Hi ${userName}!`,
+          description: "Welcome to PerformEdge. Please complete your profile.",
         });
-        // Store user data in localStorage if needed
+        // Store user data in localStorage
         localStorage.setItem('user', JSON.stringify({
           uid: result.user.uid,
           email: result.user.email,
           displayName: result.user.displayName,
         }));
-        navigate("/teacher/profile"); // Changed to redirect to profile form
+        navigate("/teacher/profile");
       }
     } catch (error) {
       console.error("Google Sign In Error:", error);
