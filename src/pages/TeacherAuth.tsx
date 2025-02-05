@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
 const TeacherAuth = () => {
@@ -37,20 +37,41 @@ const TeacherAuth = () => {
     try {
       setIsLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
-      toast({
-        title: "Success!",
-        description: "Successfully signed in with Google.",
-      });
-      // You can handle the successful sign-in here, e.g., store user data
-      console.log("Google Sign In Success:", result.user);
-      navigate("/teacher/dashboard"); // Redirect to teacher dashboard after successful sign-in
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      
+      if (credential) {
+        toast({
+          title: "Success!",
+          description: `Welcome ${result.user.displayName || 'Teacher'}!`,
+        });
+        // Store user data in localStorage if needed
+        localStorage.setItem('user', JSON.stringify({
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+        }));
+        navigate("/teacher/dashboard");
+      }
     } catch (error) {
       console.error("Google Sign In Error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to sign in with Google. Please try again.",
-        variant: "destructive",
-      });
+      if (error instanceof Error) {
+        let errorMessage = "Failed to sign in with Google. Please try again.";
+        
+        // Handle specific Firebase Auth errors
+        if (error.message.includes('popup-closed-by-user')) {
+          errorMessage = "Sign-in cancelled. Please try again.";
+        } else if (error.message.includes('auth/network-request-failed')) {
+          errorMessage = "Network error. Please check your internet connection.";
+        } else if (error.message.includes('auth/popup-blocked')) {
+          errorMessage = "Popup was blocked. Please allow popups for this site.";
+        }
+        
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -81,7 +102,7 @@ const TeacherAuth = () => {
                     disabled={isLoading}
                     type="button"
                   >
-                    Continue with Google
+                    {isLoading ? "Signing in..." : "Continue with Google"}
                   </Button>
                 </div>
               </form>
@@ -106,7 +127,7 @@ const TeacherAuth = () => {
                     disabled={isLoading}
                     type="button"
                   >
-                    Sign up with Google
+                    {isLoading ? "Signing up..." : "Sign up with Google"}
                   </Button>
                 </div>
               </form>
