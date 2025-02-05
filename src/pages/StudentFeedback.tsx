@@ -63,7 +63,9 @@ const StudentFeedback = () => {
     }
 
     if (!form?.rating) {
-      toast({: "Please provide a rating before submitting",
+      toast({
+        title: "Error",
+        description: "Please provide a rating before submitting",
         variant: "destructive",
       });
       return;
