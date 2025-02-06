@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Slider } from "@/components/ui/slider";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
@@ -41,7 +41,13 @@ const StudentFeedback = () => {
     setFeedbackForms(prev => ({
       ...prev,
       [teacherId]: {
-        ...prev[teacherId] || {},
+        ...prev[teacherId] || {
+          teachingQuality: "",
+          effectiveMethods: false,
+          approachable: false,
+          explanationClarity: "",
+          suggestedChanges: ""
+        },
         rating: rating[0]
       }
     }));
@@ -126,7 +132,13 @@ const StudentFeedback = () => {
                           setFeedbackForms(prev => ({
                             ...prev,
                             [teacher.displayName]: {
-                              ...prev[teacher.displayName] || {},
+                              ...prev[teacher.displayName] || {
+                                rating: 0,
+                                effectiveMethods: false,
+                                approachable: false,
+                                explanationClarity: "",
+                                suggestedChanges: ""
+                              },
                               teachingQuality: value
                             }
                           }))
@@ -152,7 +164,13 @@ const StudentFeedback = () => {
                           setFeedbackForms(prev => ({
                             ...prev,
                             [teacher.displayName]: {
-                              ...prev[teacher.displayName] || {},
+                              ...prev[teacher.displayName] || {
+                                rating: 0,
+                                teachingQuality: "",
+                                approachable: false,
+                                explanationClarity: "",
+                                suggestedChanges: ""
+                              },
                               effectiveMethods: checked
                             }
                           }))
@@ -173,7 +191,13 @@ const StudentFeedback = () => {
                           setFeedbackForms(prev => ({
                             ...prev,
                             [teacher.displayName]: {
-                              ...prev[teacher.displayName] || {},
+                              ...prev[teacher.displayName] || {
+                                rating: 0,
+                                teachingQuality: "",
+                                effectiveMethods: false,
+                                explanationClarity: "",
+                                suggestedChanges: ""
+                              },
                               approachable: checked
                             }
                           }))
@@ -193,7 +217,13 @@ const StudentFeedback = () => {
                           setFeedbackForms(prev => ({
                             ...prev,
                             [teacher.displayName]: {
-                              ...prev[teacher.displayName] || {},
+                              ...prev[teacher.displayName] || {
+                                rating: 0,
+                                teachingQuality: "",
+                                effectiveMethods: false,
+                                approachable: false,
+                                suggestedChanges: ""
+                              },
                               explanationClarity: value
                             }
                           }))
@@ -219,7 +249,13 @@ const StudentFeedback = () => {
                           setFeedbackForms(prev => ({
                             ...prev,
                             [teacher.displayName]: {
-                              ...prev[teacher.displayName] || {},
+                              ...prev[teacher.displayName] || {
+                                rating: 0,
+                                teachingQuality: "",
+                                effectiveMethods: false,
+                                approachable: false,
+                                explanationClarity: ""
+                              },
                               suggestedChanges: e.target.value
                             }
                           }))
