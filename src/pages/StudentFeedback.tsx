@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 
 interface TeacherInfo {
   displayName: string;
@@ -13,12 +15,17 @@ interface TeacherInfo {
 
 interface FeedbackForm {
   rating: number;
-  feedback: string;
+  teachingQuality: string;
+  effectiveMethods: boolean;
+  approachable: boolean;
+  explanationClarity: string;
+  suggestedChanges: string;
 }
 
 const StudentFeedback = () => {
   const [teachers, setTeachers] = useState<TeacherInfo[]>([]);
   const [feedbackForms, setFeedbackForms] = useState<Record<string, FeedbackForm>>({});
+  const [selectedTeacher, setSelectedTeacher] = useState<string | null>(null);
   const { toast } = useToast();
   const studentName = sessionStorage.getItem("studentName");
 
@@ -34,33 +41,14 @@ const StudentFeedback = () => {
     setFeedbackForms(prev => ({
       ...prev,
       [teacherId]: {
-        ...prev[teacherId],
+        ...prev[teacherId] || {},
         rating: rating[0]
-      }
-    }));
-  };
-
-  const handleFeedbackChange = (teacherId: string, feedback: string) => {
-    setFeedbackForms(prev => ({
-      ...prev,
-      [teacherId]: {
-        ...prev[teacherId],
-        feedback
       }
     }));
   };
 
   const handleSubmitFeedback = (teacherId: string) => {
     const form = feedbackForms[teacherId];
-    if (!form?.feedback?.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter feedback before submitting",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!form?.rating) {
       toast({
         title: "Error",
@@ -79,9 +67,14 @@ const StudentFeedback = () => {
       ...prev,
       [teacherId]: {
         rating: 0,
-        feedback: ""
+        teachingQuality: "",
+        effectiveMethods: false,
+        approachable: false,
+        explanationClarity: "",
+        suggestedChanges: ""
       }
     }));
+    setSelectedTeacher(null);
   };
 
   return (
@@ -89,21 +82,26 @@ const StudentFeedback = () => {
       <div className="max-w-4xl mx-auto space-y-8">
         <Card className="p-6">
           <h1 className="text-2xl font-bold text-center mb-6">
-            Welcome {studentName}, Provide Your Feedback
+            Welcome {studentName}, please provide your feedback with a scale of 1-10
           </h1>
 
-          {teachers.map((teacher, index) => (
-            <div key={index} className="mb-8 space-y-4">
-              <div className="bg-white rounded-lg p-6 shadow-sm">
+          {teachers.map((teacher) => (
+            <div key={teacher.displayName} className="mb-8">
+              <div 
+                className="bg-white rounded-lg p-6 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => setSelectedTeacher(teacher.displayName)}
+              >
                 <h2 className="text-xl font-semibold mb-2">
                   {teacher.displayName}
                 </h2>
                 <p className="text-gray-600">Department: {teacher.department}</p>
-                <p className="text-gray-600 mb-4">Subjects: {teacher.subjects}</p>
-                
-                <div className="space-y-4">
+                <p className="text-gray-600">Subjects: {teacher.subjects}</p>
+              </div>
+
+              {selectedTeacher === teacher.displayName && (
+                <div className="mt-4 space-y-6 p-6 bg-gray-50 rounded-lg">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Rating (1-10)</label>
+                    <label className="text-sm font-medium">Overall Rating (1-10)</label>
                     <div className="flex items-center gap-4">
                       <Slider
                         value={[feedbackForms[teacher.displayName]?.rating || 0]}
@@ -117,21 +115,128 @@ const StudentFeedback = () => {
                       </span>
                     </div>
                   </div>
-                  
-                  <Textarea
-                    placeholder="Enter your feedback for this teacher..."
-                    value={feedbackForms[teacher.displayName]?.feedback || ""}
-                    onChange={(e) => handleFeedbackChange(teacher.displayName, e.target.value)}
-                    className="min-h-[100px]"
-                  />
-                  <Button
-                    onClick={() => handleSubmitFeedback(teacher.displayName)}
-                    className="w-full"
-                  >
-                    Submit Feedback
-                  </Button>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        How would you rate the quality of teaching in this course?
+                      </label>
+                      <RadioGroup
+                        onValueChange={(value) => 
+                          setFeedbackForms(prev => ({
+                            ...prev,
+                            [teacher.displayName]: {
+                              ...prev[teacher.displayName] || {},
+                              teachingQuality: value
+                            }
+                          }))
+                        }
+                        value={feedbackForms[teacher.displayName]?.teachingQuality}
+                      >
+                        {["Excellent", "Good", "Average", "Poor", "Very Poor"].map((option) => (
+                          <div key={option} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option} id={`quality-${option}`} />
+                            <label htmlFor={`quality-${option}`}>{option}</label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        Did the instructor use effective teaching methods?
+                      </label>
+                      <Switch
+                        checked={feedbackForms[teacher.displayName]?.effectiveMethods}
+                        onCheckedChange={(checked) =>
+                          setFeedbackForms(prev => ({
+                            ...prev,
+                            [teacher.displayName]: {
+                              ...prev[teacher.displayName] || {},
+                              effectiveMethods: checked
+                            }
+                          }))
+                        }
+                      />
+                      <span className="ml-2">
+                        {feedbackForms[teacher.displayName]?.effectiveMethods ? "Yes" : "No"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        Was the instructor approachable and helpful?
+                      </label>
+                      <Switch
+                        checked={feedbackForms[teacher.displayName]?.approachable}
+                        onCheckedChange={(checked) =>
+                          setFeedbackForms(prev => ({
+                            ...prev,
+                            [teacher.displayName]: {
+                              ...prev[teacher.displayName] || {},
+                              approachable: checked
+                            }
+                          }))
+                        }
+                      />
+                      <span className="ml-2">
+                        {feedbackForms[teacher.displayName]?.approachable ? "Yes" : "No"}
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        My teacher explains difficult things clearly
+                      </label>
+                      <RadioGroup
+                        onValueChange={(value) =>
+                          setFeedbackForms(prev => ({
+                            ...prev,
+                            [teacher.displayName]: {
+                              ...prev[teacher.displayName] || {},
+                              explanationClarity: value
+                            }
+                          }))
+                        }
+                        value={feedbackForms[teacher.displayName]?.explanationClarity}
+                      >
+                        {["Never", "Rarely", "Sometimes", "Often", "Always"].map((option) => (
+                          <div key={option} className="flex items-center space-x-2">
+                            <RadioGroupItem value={option} id={`clarity-${option}`} />
+                            <label htmlFor={`clarity-${option}`}>{option}</label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium block mb-2">
+                        What is one change that you would like to see in the teaching method?
+                      </label>
+                      <Textarea
+                        value={feedbackForms[teacher.displayName]?.suggestedChanges || ""}
+                        onChange={(e) =>
+                          setFeedbackForms(prev => ({
+                            ...prev,
+                            [teacher.displayName]: {
+                              ...prev[teacher.displayName] || {},
+                              suggestedChanges: e.target.value
+                            }
+                          }))
+                        }
+                        className="min-h-[100px]"
+                      />
+                    </div>
+
+                    <Button
+                      onClick={() => handleSubmitFeedback(teacher.displayName)}
+                      className="w-full"
+                    >
+                      Submit Feedback
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           ))}
         </Card>

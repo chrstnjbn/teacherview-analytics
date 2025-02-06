@@ -15,8 +15,8 @@ const StudentEntry = () => {
     if (name.trim()) {
       sessionStorage.setItem("studentName", name.trim());
       toast({
-        title: "Welcome!",
-        description: "You can now provide feedback for teachers.",
+        title: "Success",
+        description: "Welcome! You can now provide feedback.",
       });
       navigate("/student/feedback");
     }
@@ -26,7 +26,7 @@ const StudentEntry = () => {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
       <div className="max-w-4xl mx-auto space-y-8">
         <Card className="p-6">
-          <h1 className="text-2xl font-bold text-center mb-6">Welcome Student!</h1>
+          <h1 className="text-2xl font-bold text-center mb-6">Student Entry</h1>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Input
@@ -34,7 +34,6 @@ const StudentEntry = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full"
               />
             </div>
             <Button type="submit" className="w-full">
