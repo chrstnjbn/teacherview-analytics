@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { Slider } from "@/components/ui/slider";
-import { Star } from "lucide-react";
 
 interface TeacherInfo {
   displayName: string;
@@ -71,13 +70,11 @@ const StudentFeedback = () => {
       return;
     }
 
-    // Here you would typically send the feedback to a backend
     toast({
       title: "Success",
       description: "Feedback submitted successfully",
     });
 
-    // Clear the feedback form
     setFeedbackForms(prev => ({
       ...prev,
       [teacherId]: {
@@ -85,17 +82,6 @@ const StudentFeedback = () => {
         feedback: ""
       }
     }));
-  };
-
-  const renderStars = (rating: number) => {
-    return Array(5).fill(0).map((_, index) => (
-      <Star
-        key={index}
-        className={`w-5 h-5 ${
-          index < rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
-        }`}
-      />
-    ));
   };
 
   return (
@@ -117,18 +103,18 @@ const StudentFeedback = () => {
                 
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Rating</label>
+                    <label className="text-sm font-medium">Rating (1-10)</label>
                     <div className="flex items-center gap-4">
                       <Slider
                         value={[feedbackForms[teacher.displayName]?.rating || 0]}
                         onValueChange={(value) => handleRatingChange(teacher.displayName, value)}
-                        max={5}
+                        max={10}
                         step={1}
                         className="w-48"
                       />
-                      <div className="flex gap-1">
-                        {renderStars(feedbackForms[teacher.displayName]?.rating || 0)}
-                      </div>
+                      <span className="text-lg font-semibold">
+                        {feedbackForms[teacher.displayName]?.rating || 0}
+                      </span>
                     </div>
                   </div>
                   

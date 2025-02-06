@@ -1,37 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-interface TeacherInfo {
-  displayName: string;
-  department: string;
-  subjects: string;
-}
 
 const StudentEntry = () => {
   const [name, setName] = useState("");
-  const [teacherInfo, setTeacherInfo] = useState<TeacherInfo[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  useEffect(() => {
-    const storedTeacherInfo = localStorage.getItem('teacherProfile');
-    if (storedTeacherInfo) {
-      const teacherData = JSON.parse(storedTeacherInfo);
-      setTeacherInfo([teacherData]);
-    }
-  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,30 +42,6 @@ const StudentEntry = () => {
             </Button>
           </form>
         </Card>
-
-        {teacherInfo.length > 0 && (
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Available Teachers</h2>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Subjects</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teacherInfo.map((teacher, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{teacher.displayName}</TableCell>
-                    <TableCell>{teacher.department}</TableCell>
-                    <TableCell>{teacher.subjects}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Card>
-        )}
       </div>
     </div>
   );
