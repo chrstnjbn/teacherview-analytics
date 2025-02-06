@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,10 +31,14 @@ const StudentFeedback = () => {
   const studentName = sessionStorage.getItem("studentName");
 
   useEffect(() => {
+    console.log("Loading teacher data...");
     const storedTeacherInfo = localStorage.getItem('teacherProfile');
     if (storedTeacherInfo) {
       const teacherData = JSON.parse(storedTeacherInfo);
+      console.log("Teacher data loaded:", teacherData);
       setTeachers([teacherData]);
+    } else {
+      console.log("No teacher data found in localStorage");
     }
   }, []);
 
