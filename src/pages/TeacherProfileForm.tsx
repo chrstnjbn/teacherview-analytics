@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import {
   Form,
   FormControl,
@@ -29,7 +29,6 @@ const TeacherProfileForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Get user data from localStorage
   const userData = localStorage.getItem('user');
   const user = userData ? JSON.parse(userData) : null;
 
@@ -47,12 +46,35 @@ const TeacherProfileForm = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       setIsLoading(true);
-      // Store teacher profile data
+      
+      // Create the profile data
       const profileData = {
         ...values,
         displayName: user?.displayName || 'Teacher',
       };
+
+      // Store individual teacher profile (keeping old format for compatibility)
       localStorage.setItem('teacherProfile', JSON.stringify(profileData));
+      
+      // Store in all teachers array
+      const existingTeachersString = localStorage.getItem('allTeachers');
+      const existingTeachers = existingTeachersString ? JSON.parse(existingTeachersString) : [];
+      
+      // Check if teacher already exists
+      const teacherIndex = existingTeachers.findIndex(
+        (t: any) => t.displayName === profileData.displayName
+      );
+      
+      if (teacherIndex >= 0) {
+        // Update existing teacher
+        existingTeachers[teacherIndex] = profileData;
+      } else {
+        // Add new teacher
+        existingTeachers.push(profileData);
+      }
+      
+      // Save updated teachers array
+      localStorage.setItem('allTeachers', JSON.stringify(existingTeachers));
       
       toast({
         title: "Profile Updated",

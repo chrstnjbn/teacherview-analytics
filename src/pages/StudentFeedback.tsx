@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,11 +31,32 @@ const StudentFeedback = () => {
 
   useEffect(() => {
     console.log("Loading teacher data...");
+    // Get all registered teachers from localStorage
+    const registeredTeachers: TeacherInfo[] = [];
+    
+    // Try to get the singular teacher profile (old format)
     const storedTeacherInfo = localStorage.getItem('teacherProfile');
     if (storedTeacherInfo) {
       const teacherData = JSON.parse(storedTeacherInfo);
-      console.log("Teacher data loaded:", teacherData);
-      setTeachers([teacherData]);
+      console.log("Individual teacher data loaded:", teacherData);
+      registeredTeachers.push(teacherData);
+    }
+    
+    // Try to get all teacher profiles
+    const allTeachersString = localStorage.getItem('allTeachers');
+    if (allTeachersString) {
+      const allTeachers = JSON.parse(allTeachersString);
+      console.log("All teachers data loaded:", allTeachers);
+      registeredTeachers.push(...allTeachers);
+    }
+
+    if (registeredTeachers.length > 0) {
+      // Remove duplicates based on displayName
+      const uniqueTeachers = Array.from(
+        new Map(registeredTeachers.map(teacher => [teacher.displayName, teacher])).values()
+      );
+      console.log("Final unique teachers list:", uniqueTeachers);
+      setTeachers(uniqueTeachers);
     } else {
       console.log("No teacher data found in localStorage");
     }
