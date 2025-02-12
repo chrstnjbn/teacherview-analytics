@@ -115,17 +115,28 @@ const TeacherAuth = () => {
     setIsLoading(true);
     
     try {
-      // Validate passwords match
       if (formData.password !== formData.confirmPassword) {
         throw new Error("Passwords do not match");
       }
 
-      // Create user with email and password
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
+
+      // Create initial profile data during sign up
+      const profileData = {
+        teacherId: "", // Can be updated later
+        department: "", // Can be updated later
+        subjects: "", // Can be updated later
+        courses: "", // Can be updated later
+        researchPapers: "", // Can be updated later
+        displayName: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        mobile: formData.mobile,
+        uid: userCredential.user.uid
+      };
 
       // Store user data
       const userData = {
@@ -136,10 +147,17 @@ const TeacherAuth = () => {
 
       // Store in localStorage
       localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('teacherProfile', JSON.stringify(profileData));
+
+      // Also store in allTeachers array
+      const existingTeachersData = localStorage.getItem('allTeachers');
+      const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
+      teachers.push(profileData);
+      localStorage.setItem('allTeachers', JSON.stringify(teachers));
 
       toast({
         title: "Success",
-        description: "Account created successfully. Please complete your profile.",
+        description: "Account created successfully. Please complete your additional details.",
       });
 
       navigate("/teacher/profile");
