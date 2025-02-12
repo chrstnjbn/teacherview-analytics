@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 
 interface SignUpFormData {
@@ -18,8 +17,17 @@ interface SignUpFormData {
   confirmPassword: string;
 }
 
+interface SignInFormData {
+  email: string;
+  password: string;
+}
+
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [signInData, setSignInData] = useState<SignInFormData>({
+    email: "",
+    password: ""
+  });
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: "",
     lastName: "",
@@ -31,14 +39,67 @@ const TeacherAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  const handleSignIn = (e: React.FormEvent) => {
+  const handleSignInChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setSignInData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    toast({
-      title: "Coming Soon",
-      description: "Sign in functionality will be implemented soon.",
-    });
-    setIsLoading(false);
+    
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        signInData.email,
+        signInData.password
+      );
+
+      // Get user data from localStorage if it exists
+      const existingUserData = localStorage.getItem('allTeachers');
+      const teachers = existingUserData ? JSON.parse(existingUserData) : [];
+      const teacher = teachers.find((t: any) => t.email === userCredential.user.email);
+
+      // Store user data
+      const userData = {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: userCredential.user.displayName || teacher?.displayName || 'Teacher',
+      };
+
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      toast({
+        title: "Success",
+        description: "Signed in successfully.",
+      });
+
+      // If teacher profile exists, go to dashboard, otherwise go to profile page
+      const hasProfile = localStorage.getItem('teacherProfile');
+      navigate(hasProfile ? "/teacher/dashboard" : "/teacher/profile");
+    } catch (error) {
+      console.error("Sign In Error:", error);
+      let errorMessage = "Invalid email or password. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('auth/user-not-found')) {
+          errorMessage = "No account found with this email.";
+        } else if (error.message.includes('auth/wrong-password')) {
+          errorMessage = "Incorrect password.";
+        }
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,10 +221,24 @@ const TeacherAuth = () => {
             
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
-                <Input type="email" placeholder="Email" required />
-                <Input type="password" placeholder="Password" required />
+                <Input 
+                  type="email" 
+                  name="email"
+                  placeholder="Email" 
+                  value={signInData.email}
+                  onChange={handleSignInChange}
+                  required 
+                />
+                <Input 
+                  type="password" 
+                  name="password"
+                  placeholder="Password" 
+                  value={signInData.password}
+                  onChange={handleSignInChange}
+                  required 
+                />
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  Sign In
+                  {isLoading ? "Signing in..." : "Sign In"}
                 </Button>
                 <div className="text-center">
                   <Button 
