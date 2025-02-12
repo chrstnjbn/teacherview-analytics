@@ -1,15 +1,33 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { auth, googleProvider } from "@/lib/firebase";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
+
+interface SignUpFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mobile: string;
+  password: string;
+  confirmPassword: string;
+}
 
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<SignUpFormData>({
+    firstName: "",
+    lastName: "",
+    email: "",
+    mobile: "",
+    password: "",
+    confirmPassword: ""
+  });
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -23,14 +41,67 @@ const TeacherAuth = () => {
     setIsLoading(false);
   };
 
-  const handleSignUp = (e: React.FormEvent) => {
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    toast({
-      title: "Coming Soon",
-      description: "Sign up functionality will be implemented soon.",
-    });
-    setIsLoading(false);
+    
+    try {
+      // Validate passwords match
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      // Create user with email and password
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+
+      // Store user data
+      const userData = {
+        uid: userCredential.user.uid,
+        email: userCredential.user.email,
+        displayName: `${formData.firstName} ${formData.lastName}`,
+      };
+
+      // Store in localStorage
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      toast({
+        title: "Success",
+        description: "Account created successfully. Please complete your profile.",
+      });
+
+      navigate("/teacher/profile");
+    } catch (error) {
+      console.error("Sign Up Error:", error);
+      let errorMessage = "Failed to create account. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('auth/email-already-in-use')) {
+          errorMessage = "Email is already registered. Please use a different email.";
+        } else if (error.message === "Passwords do not match") {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleSignIn = async () => {
@@ -110,14 +181,54 @@ const TeacherAuth = () => {
 
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-4">
-                <Input placeholder="First Name" required />
-                <Input placeholder="Last Name" required />
-                <Input type="email" placeholder="Email" required />
-                <Input type="tel" placeholder="Mobile Number" required />
-                <Input type="password" placeholder="Password" required />
-                <Input type="password" placeholder="Confirm Password" required />
+                <Input 
+                  name="firstName"
+                  placeholder="First Name" 
+                  value={formData.firstName}
+                  onChange={handleFormChange}
+                  required 
+                />
+                <Input 
+                  name="lastName"
+                  placeholder="Last Name" 
+                  value={formData.lastName}
+                  onChange={handleFormChange}
+                  required 
+                />
+                <Input 
+                  name="email"
+                  type="email" 
+                  placeholder="Email" 
+                  value={formData.email}
+                  onChange={handleFormChange}
+                  required 
+                />
+                <Input 
+                  name="mobile"
+                  type="tel" 
+                  placeholder="Mobile Number" 
+                  value={formData.mobile}
+                  onChange={handleFormChange}
+                  required 
+                />
+                <Input 
+                  name="password"
+                  type="password" 
+                  placeholder="Password" 
+                  value={formData.password}
+                  onChange={handleFormChange}
+                  required 
+                />
+                <Input 
+                  name="confirmPassword"
+                  type="password" 
+                  placeholder="Confirm Password" 
+                  value={formData.confirmPassword}
+                  onChange={handleFormChange}
+                  required 
+                />
                 <Button type="submit" className="w-full" disabled={isLoading}>
-                  Sign Up
+                  {isLoading ? "Creating Account..." : "Sign Up"}
                 </Button>
                 <div className="text-center">
                   <Button 
