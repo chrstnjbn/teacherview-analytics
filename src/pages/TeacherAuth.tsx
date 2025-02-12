@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -59,27 +60,33 @@ const TeacherAuth = () => {
       );
 
       // Get user data from localStorage if it exists
-      const existingUserData = localStorage.getItem('allTeachers');
-      const teachers = existingUserData ? JSON.parse(existingUserData) : [];
+      const existingTeachersData = localStorage.getItem('allTeachers');
+      const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
       const teacher = teachers.find((t: any) => t.email === userCredential.user.email);
 
-      // Store user data
-      const userData = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: userCredential.user.displayName || teacher?.displayName || 'Teacher',
-      };
-
-      localStorage.setItem('user', JSON.stringify(userData));
+      if (teacher) {
+        // If teacher exists, store their profile
+        localStorage.setItem('teacherProfile', JSON.stringify(teacher));
+        localStorage.setItem('user', JSON.stringify({
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: teacher.displayName,
+        }));
+        navigate("/teacher/dashboard");
+      } else {
+        // If no profile exists, redirect to profile creation
+        localStorage.setItem('user', JSON.stringify({
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: userCredential.user.displayName || 'Teacher',
+        }));
+        navigate("/teacher/profile");
+      }
 
       toast({
         title: "Success",
         description: "Signed in successfully.",
       });
-
-      // If teacher profile exists, go to dashboard, otherwise go to profile page
-      const hasProfile = localStorage.getItem('teacherProfile');
-      navigate(hasProfile ? "/teacher/dashboard" : "/teacher/profile");
     } catch (error) {
       console.error("Sign In Error:", error);
       let errorMessage = "Invalid email or password. Please try again.";
@@ -127,11 +134,11 @@ const TeacherAuth = () => {
 
       // Create initial profile data during sign up
       const profileData = {
-        teacherId: "", // Can be updated later
-        department: "", // Can be updated later
-        subjects: "", // Can be updated later
-        courses: "", // Can be updated later
-        researchPapers: "", // Can be updated later
+        teacherId: "",
+        department: "",
+        subjects: "",
+        courses: "",
+        researchPapers: "",
         displayName: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         mobile: formData.mobile,
@@ -157,7 +164,7 @@ const TeacherAuth = () => {
 
       toast({
         title: "Success",
-        description: "Account created successfully. Please complete your additional details.",
+        description: "Account created successfully. Please complete your profile.",
       });
 
       navigate("/teacher/profile");
@@ -187,15 +194,23 @@ const TeacherAuth = () => {
     try {
       setIsLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
       
-      if (credential) {
-        const userName = result.user.displayName || 'Teacher';
-        toast({
-          title: `Hi ${userName}!`,
-          description: "Welcome to PerformEdge. Please complete your profile.",
-        });
-        // Store user data in localStorage
+      // Check if user already has a profile
+      const existingTeachersData = localStorage.getItem('allTeachers');
+      const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
+      const existingTeacher = teachers.find((t: any) => t.email === result.user.email);
+
+      if (existingTeacher) {
+        // If profile exists, store it and go to dashboard
+        localStorage.setItem('teacherProfile', JSON.stringify(existingTeacher));
+        localStorage.setItem('user', JSON.stringify({
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName,
+        }));
+        navigate("/teacher/dashboard");
+      } else {
+        // If no profile, create basic user data and redirect to profile creation
         localStorage.setItem('user', JSON.stringify({
           uid: result.user.uid,
           email: result.user.email,
@@ -203,11 +218,16 @@ const TeacherAuth = () => {
         }));
         navigate("/teacher/profile");
       }
+
+      toast({
+        title: `Welcome${result.user.displayName ? ` ${result.user.displayName}` : ''}!`,
+        description: existingTeacher ? "Successfully signed in." : "Please complete your profile.",
+      });
     } catch (error) {
       console.error("Google Sign In Error:", error);
+      let errorMessage = "Failed to sign in with Google. Please try again.";
+      
       if (error instanceof Error) {
-        let errorMessage = "Failed to sign in with Google. Please try again.";
-        
         if (error.message.includes('popup-closed-by-user')) {
           errorMessage = "Sign-in cancelled. Please try again.";
         } else if (error.message.includes('auth/network-request-failed')) {
@@ -215,13 +235,13 @@ const TeacherAuth = () => {
         } else if (error.message.includes('auth/popup-blocked')) {
           errorMessage = "Popup was blocked. Please allow popups for this site.";
         }
-        
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
       }
+      
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
