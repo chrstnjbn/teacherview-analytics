@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,14 @@ const TeacherProfileForm = () => {
   const profileData = localStorage.getItem('teacherProfile');
   const existingProfile = profileData ? JSON.parse(profileData) : null;
 
+  useEffect(() => {
+    // Check if user exists and has a complete profile
+    if (existingProfile && existingProfile.teacherId && !isEditing) {
+      // If they have a complete profile and we're not editing, go to dashboard
+      navigate("/teacher/dashboard");
+    }
+  }, [existingProfile, isEditing, navigate]);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -47,13 +54,6 @@ const TeacherProfileForm = () => {
       researchPapers: existingProfile?.researchPapers || "",
     },
   });
-
-  useEffect(() => {
-    // If profile exists and we're not in edit mode, redirect to dashboard
-    if (existingProfile && !isEditing) {
-      navigate("/teacher/dashboard");
-    }
-  }, [existingProfile, isEditing, navigate]);
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {

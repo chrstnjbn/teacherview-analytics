@@ -49,7 +49,8 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
       const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
       const teacher = teachers.find((t: any) => t.email === userCredential.user.email);
 
-      if (teacher) {
+      if (teacher && teacher.teacherId) {
+        // If teacher exists and has completed their profile
         localStorage.setItem('teacherProfile', JSON.stringify(teacher));
         localStorage.setItem('user', JSON.stringify({
           uid: userCredential.user.uid,
@@ -57,12 +58,38 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
           displayName: teacher.displayName,
         }));
         navigate("/teacher/dashboard");
+      } else if (teacher) {
+        // If teacher exists but hasn't completed their profile
+        localStorage.setItem('teacherProfile', JSON.stringify(teacher));
+        localStorage.setItem('user', JSON.stringify({
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: teacher.displayName,
+        }));
+        navigate("/teacher/profile");
       } else {
+        // New user
+        const newProfile = {
+          teacherId: "",
+          department: "",
+          subjects: "",
+          courses: "",
+          researchPapers: "",
+          displayName: userCredential.user.displayName || 'Teacher',
+          email: userCredential.user.email,
+          uid: userCredential.user.uid
+        };
+        localStorage.setItem('teacherProfile', JSON.stringify(newProfile));
         localStorage.setItem('user', JSON.stringify({
           uid: userCredential.user.uid,
           email: userCredential.user.email,
           displayName: userCredential.user.displayName || 'Teacher',
         }));
+        
+        // Add to allTeachers
+        teachers.push(newProfile);
+        localStorage.setItem('allTeachers', JSON.stringify(teachers));
+        
         navigate("/teacher/profile");
       }
 
