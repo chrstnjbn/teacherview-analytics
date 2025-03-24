@@ -22,6 +22,7 @@ interface SignUpFormData {
   password: string;
   confirmPassword: string;
   collegeCode: string;
+  staffId: string;
 }
 
 export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFormProps) => {
@@ -32,9 +33,11 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
     mobile: "",
     password: "",
     confirmPassword: "",
-    collegeCode: ""
+    collegeCode: "",
+    staffId: ""
   });
   const [savedStaffCode, setSavedStaffCode] = useState("");
+  const [savedStaffId, setSavedStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -43,6 +46,12 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
     const storedStaffCode = localStorage.getItem("collegeStaffCode");
     if (storedStaffCode) {
       setSavedStaffCode(storedStaffCode);
+    }
+    
+    // Get the admin staff ID
+    const storedStaffId = localStorage.getItem("adminStaffId");
+    if (storedStaffId) {
+      setSavedStaffId(storedStaffId);
     }
   }, []);
 
@@ -75,7 +84,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
         );
 
         const profileData = {
-          teacherId: "",
+          teacherId: formData.staffId,
           department: "",
           subjects: "",
           courses: "",
@@ -91,7 +100,8 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           uid: userCredential.user.uid,
           email: userCredential.user.email,
           displayName: `${formData.firstName} ${formData.lastName}`,
-          collegeCode: enteredCode
+          collegeCode: enteredCode,
+          staffId: formData.staffId
         };
 
         localStorage.setItem('user', JSON.stringify(userData));
@@ -196,7 +206,16 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           onChange={handleFormChange}
           required 
           className="uppercase"
-          maxLength={6}
+          maxLength={8}
+        />
+      </div>
+      <div className="space-y-1">
+        <Input 
+          name="staffId"
+          placeholder="Staff ID" 
+          value={formData.staffId}
+          onChange={handleFormChange}
+          required 
         />
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>

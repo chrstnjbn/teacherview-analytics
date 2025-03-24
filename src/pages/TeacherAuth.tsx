@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -15,6 +16,7 @@ const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [collegeCode, setCollegeCode] = useState("");
+  const [staffId, setStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -82,15 +84,25 @@ const TeacherAuth = () => {
       return;
     }
 
+    if (!staffId.trim()) {
+      toast({
+        title: "Staff ID Required",
+        description: "Please enter your staff ID to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const codePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
     
     localStorage.setItem("collegeStaffCode", codePrefix);
     localStorage.setItem("collegeStudentCode", codePrefix);
+    localStorage.setItem("adminStaffId", staffId.trim());
     
     setIsVerified(true);
     toast({
       title: "Success",
-      description: "College code verified. You can now proceed with login.",
+      description: "College code and staff ID verified. You can now proceed with login.",
     });
   };
 
@@ -101,7 +113,7 @@ const TeacherAuth = () => {
           <Card className="p-6">
             <h1 className="text-2xl font-bold text-center mb-6">Admin Verification</h1>
             <p className="text-gray-600 mb-6 text-center">
-              Please enter the college code to proceed.
+              Please enter the college code and your staff ID to proceed.
             </p>
             
             <div className="space-y-6">
@@ -117,6 +129,16 @@ const TeacherAuth = () => {
                   onChange={(e) => setCollegeCode(e.target.value.slice(0, 8))}
                   maxLength={8}
                   className="uppercase"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="staffId">Staff ID</Label>
+                <Input
+                  id="staffId"
+                  placeholder="Enter your staff ID"
+                  value={staffId}
+                  onChange={(e) => setStaffId(e.target.value)}
                 />
               </div>
               

@@ -17,15 +17,18 @@ interface SignInFormData {
   email: string;
   password: string;
   collegeCode: string;
+  staffId: string;
 }
 
 export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFormProps) => {
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
     password: "",
-    collegeCode: ""
+    collegeCode: "",
+    staffId: ""
   });
   const [savedStaffCode, setSavedStaffCode] = useState("");
+  const [savedStaffId, setSavedStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -34,6 +37,12 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
     const storedStaffCode = localStorage.getItem("collegeStaffCode");
     if (storedStaffCode) {
       setSavedStaffCode(storedStaffCode);
+    }
+    
+    // Get the admin staff ID
+    const storedStaffId = localStorage.getItem("adminStaffId");
+    if (storedStaffId) {
+      setSavedStaffId(storedStaffId);
     }
   }, []);
 
@@ -69,7 +78,7 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
         if (!teacher) {
           // If teacher doesn't exist in our system, create a new profile
           teacher = {
-            teacherId: "",
+            teacherId: signInData.staffId,
             department: "",
             subjects: "",
             courses: "",
@@ -87,8 +96,14 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
           // Update the college code if it's not set yet
           if (!teacher.collegeCode) {
             teacher.collegeCode = enteredCode;
-            localStorage.setItem('allTeachers', JSON.stringify(teachers));
           }
+          
+          // Update staff ID if it's not set yet
+          if (!teacher.teacherId && signInData.staffId) {
+            teacher.teacherId = signInData.staffId;
+          }
+          
+          localStorage.setItem('allTeachers', JSON.stringify(teachers));
         }
 
         // Store the current user's profile
@@ -97,7 +112,8 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
           uid: userCredential.user.uid,
           email: userCredential.user.email,
           displayName: teacher.displayName,
-          collegeCode: enteredCode
+          collegeCode: enteredCode,
+          staffId: teacher.teacherId || signInData.staffId
         }));
 
         // Navigate based on profile completion
@@ -175,7 +191,18 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
             onChange={handleSignInChange}
             required 
             className="w-full uppercase"
-            maxLength={6}
+            maxLength={8}
+          />
+        </div>
+        <div className="space-y-1">
+          <Input 
+            type="text" 
+            name="staffId"
+            placeholder="Staff ID" 
+            value={signInData.staffId}
+            onChange={handleSignInChange}
+            required 
+            className="w-full"
           />
         </div>
       </div>
