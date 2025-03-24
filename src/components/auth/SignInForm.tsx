@@ -11,6 +11,7 @@ interface SignInFormProps {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   onGoogleSignIn: () => void;
+  isAdminRoute?: boolean;
 }
 
 interface SignInFormData {
@@ -20,7 +21,7 @@ interface SignInFormData {
   staffId: string;
 }
 
-export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFormProps) => {
+export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRoute = false }: SignInFormProps) => {
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
     password: "",
@@ -78,7 +79,7 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
         if (!teacher) {
           // If teacher doesn't exist in our system, create a new profile
           teacher = {
-            teacherId: signInData.staffId,
+            teacherId: isAdminRoute ? signInData.staffId : "",
             department: "",
             subjects: "",
             courses: "",
@@ -98,8 +99,8 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
             teacher.collegeCode = enteredCode;
           }
           
-          // Update staff ID if it's not set yet
-          if (!teacher.teacherId && signInData.staffId) {
+          // Update staff ID if it's not set yet and we're on admin route
+          if (isAdminRoute && !teacher.teacherId && signInData.staffId) {
             teacher.teacherId = signInData.staffId;
           }
           
@@ -113,12 +114,12 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
           email: userCredential.user.email,
           displayName: teacher.displayName,
           collegeCode: enteredCode,
-          staffId: teacher.teacherId || signInData.staffId
+          staffId: isAdminRoute ? (teacher.teacherId || signInData.staffId) : ""
         }));
 
         // Navigate based on profile completion
         if (teacher.teacherId) {
-          navigate("/teacher/dashboard");
+          navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
         } else {
           navigate("/teacher/profile");
         }
@@ -194,17 +195,19 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignInFo
             maxLength={8}
           />
         </div>
-        <div className="space-y-1">
-          <Input 
-            type="text" 
-            name="staffId"
-            placeholder="Staff ID" 
-            value={signInData.staffId}
-            onChange={handleSignInChange}
-            required 
-            className="w-full"
-          />
-        </div>
+        {isAdminRoute && (
+          <div className="space-y-1">
+            <Input 
+              type="text" 
+              name="staffId"
+              placeholder="Staff ID" 
+              value={signInData.staffId}
+              onChange={handleSignInChange}
+              required 
+              className="w-full"
+            />
+          </div>
+        )}
       </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Signing in..." : "Sign In"}

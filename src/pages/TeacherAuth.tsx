@@ -1,6 +1,6 @@
 
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,8 @@ const TeacherAuth = () => {
   const [staffId, setStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.includes('/admin');
 
   const handleGoogleSignIn = async () => {
     try {
@@ -84,7 +86,7 @@ const TeacherAuth = () => {
       return;
     }
 
-    if (!staffId.trim()) {
+    if (isAdminRoute && !staffId.trim()) {
       toast({
         title: "Staff ID Required",
         description: "Please enter your staff ID to continue.",
@@ -97,12 +99,15 @@ const TeacherAuth = () => {
     
     localStorage.setItem("collegeStaffCode", codePrefix);
     localStorage.setItem("collegeStudentCode", codePrefix);
-    localStorage.setItem("adminStaffId", staffId.trim());
+    
+    if (isAdminRoute && staffId.trim()) {
+      localStorage.setItem("adminStaffId", staffId.trim());
+    }
     
     setIsVerified(true);
     toast({
       title: "Success",
-      description: "College code and staff ID verified. You can now proceed with login.",
+      description: `College code${isAdminRoute ? " and staff ID" : ""} verified. You can now proceed with login.`,
     });
   };
 
@@ -111,9 +116,11 @@ const TeacherAuth = () => {
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
         <div className="max-w-md mx-auto">
           <Card className="p-6">
-            <h1 className="text-2xl font-bold text-center mb-6">Admin Verification</h1>
+            <h1 className="text-2xl font-bold text-center mb-6">
+              {isAdminRoute ? "Admin Verification" : "Teacher Verification"}
+            </h1>
             <p className="text-gray-600 mb-6 text-center">
-              Please enter the college code and your staff ID to proceed.
+              Please enter the college code{isAdminRoute ? " and your staff ID" : ""} to proceed.
             </p>
             
             <div className="space-y-6">
@@ -132,15 +139,17 @@ const TeacherAuth = () => {
                 />
               </div>
               
-              <div className="space-y-2">
-                <Label htmlFor="staffId">Staff ID</Label>
-                <Input
-                  id="staffId"
-                  placeholder="Enter your staff ID"
-                  value={staffId}
-                  onChange={(e) => setStaffId(e.target.value)}
-                />
-              </div>
+              {isAdminRoute && (
+                <div className="space-y-2">
+                  <Label htmlFor="staffId">Staff ID</Label>
+                  <Input
+                    id="staffId"
+                    placeholder="Enter your staff ID"
+                    value={staffId}
+                    onChange={(e) => setStaffId(e.target.value)}
+                  />
+                </div>
+              )}
               
               <Button 
                 onClick={handleVerifyCollegeCodes} 
@@ -171,6 +180,7 @@ const TeacherAuth = () => {
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
                 onGoogleSignIn={handleGoogleSignIn}
+                isAdminRoute={isAdminRoute}
               />
             </TabsContent>
 
@@ -179,6 +189,7 @@ const TeacherAuth = () => {
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
                 onGoogleSignIn={handleGoogleSignIn}
+                isAdminRoute={isAdminRoute}
               />
             </TabsContent>
           </Tabs>

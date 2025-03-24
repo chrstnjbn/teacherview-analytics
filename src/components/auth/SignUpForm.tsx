@@ -12,6 +12,7 @@ interface SignUpFormProps {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   onGoogleSignIn: () => void;
+  isAdminRoute?: boolean;
 }
 
 interface SignUpFormData {
@@ -25,7 +26,7 @@ interface SignUpFormData {
   staffId: string;
 }
 
-export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFormProps) => {
+export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRoute = false }: SignUpFormProps) => {
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: "",
     lastName: "",
@@ -84,7 +85,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
         );
 
         const profileData = {
-          teacherId: formData.staffId,
+          teacherId: isAdminRoute ? formData.staffId : "",
           department: "",
           subjects: "",
           courses: "",
@@ -101,7 +102,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           email: userCredential.user.email,
           displayName: `${formData.firstName} ${formData.lastName}`,
           collegeCode: enteredCode,
-          staffId: formData.staffId
+          staffId: isAdminRoute ? formData.staffId : ""
         };
 
         localStorage.setItem('user', JSON.stringify(userData));
@@ -117,7 +118,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           description: "Account created successfully. Please complete your profile.",
         });
 
-        navigate("/teacher/profile");
+        navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/profile");
       } else {
         throw new Error("invalid-college-code");
       }
@@ -209,15 +210,17 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           maxLength={8}
         />
       </div>
-      <div className="space-y-1">
-        <Input 
-          name="staffId"
-          placeholder="Staff ID" 
-          value={formData.staffId}
-          onChange={handleFormChange}
-          required 
-        />
-      </div>
+      {isAdminRoute && (
+        <div className="space-y-1">
+          <Input 
+            name="staffId"
+            placeholder="Staff ID" 
+            value={formData.staffId}
+            onChange={handleFormChange}
+            required 
+          />
+        </div>
+      )}
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Creating Account..." : "Sign Up"}
       </Button>
