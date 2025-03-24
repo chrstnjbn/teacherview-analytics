@@ -33,15 +33,15 @@ const StudentEntry = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && semester && collegeCode.trim()) {
-      // Check if the college code matches the stored student code
-      const enteredCode = collegeCode.trim().toUpperCase();
+      // Check if the college code matches the stored student code (first 3 letters)
+      const enteredCodePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
       
       // If no code is saved (first time setup) or the code matches
-      if (!savedStudentCode || enteredCode.startsWith(savedStudentCode)) {
+      if (!savedStudentCode || enteredCodePrefix === savedStudentCode) {
         // Store all student information in sessionStorage
         sessionStorage.setItem("studentName", name.trim());
         sessionStorage.setItem("studentSemester", semester);
-        sessionStorage.setItem("studentCollegeCode", enteredCode);
+        sessionStorage.setItem("studentCollegeCode", collegeCode.trim().toUpperCase());
         
         toast({
           title: "Success",
@@ -101,18 +101,18 @@ const StudentEntry = () => {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="collegeCode">College Code</Label>
+              <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
               {savedStudentCode && (
                 <div className="text-sm text-gray-500 mb-1">
-                  Your college code should start with: {savedStudentCode}
+                  Your college code must start with: {savedStudentCode}
                 </div>
               )}
               <Input
                 id="collegeCode"
                 placeholder="Enter your college code"
                 value={collegeCode}
-                onChange={(e) => setCollegeCode(e.target.value)}
-                required
+                onChange={(e) => setCollegeCode(e.target.value.slice(0, 8))}
+                maxLength={8}
                 className="uppercase"
               />
             </div>

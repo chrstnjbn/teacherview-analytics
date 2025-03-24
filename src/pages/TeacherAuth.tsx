@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -15,8 +14,7 @@ import { Label } from "@/components/ui/label";
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  const [collegeStaffCode, setCollegeStaffCode] = useState("");
-  const [collegeStudentCode, setCollegeStudentCode] = useState("");
+  const [collegeCode, setCollegeCode] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -75,35 +73,24 @@ const TeacherAuth = () => {
   };
 
   const handleVerifyCollegeCodes = () => {
-    // Validation check - both codes must be exactly 3 characters
-    if (collegeStaffCode.trim().length !== 3 || collegeStudentCode.trim().length !== 3) {
+    if (collegeCode.trim().length < 3) {
       toast({
-        title: "Invalid College Codes",
-        description: "Both college codes must be exactly 3 characters.",
+        title: "Invalid College Code",
+        description: "College code must be at least 3 characters.",
         variant: "destructive",
       });
       return;
     }
 
-    // Verify college codes (in a real app, you would check these against a database)
-    // For now, we'll just ensure they're different from each other
-    if (collegeStaffCode.trim() === collegeStudentCode.trim()) {
-      toast({
-        title: "Invalid College Codes",
-        description: "Staff and student college codes cannot be the same.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Store the college codes in localStorage for future use
-    localStorage.setItem("collegeStaffCode", collegeStaffCode.trim().toUpperCase());
-    localStorage.setItem("collegeStudentCode", collegeStudentCode.trim().toUpperCase());
+    const codePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
+    
+    localStorage.setItem("collegeStaffCode", codePrefix);
+    localStorage.setItem("collegeStudentCode", codePrefix);
     
     setIsVerified(true);
     toast({
       title: "Success",
-      description: "College codes verified. You can now proceed with login.",
+      description: "College code verified. You can now proceed with login.",
     });
   };
 
@@ -114,30 +101,21 @@ const TeacherAuth = () => {
           <Card className="p-6">
             <h1 className="text-2xl font-bold text-center mb-6">Admin Verification</h1>
             <p className="text-gray-600 mb-6 text-center">
-              Please enter the college codes to proceed.
+              Please enter the college code to proceed.
             </p>
             
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="collegeStaffCode">Staff College Code (3 letters)</Label>
+                <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
+                <p className="text-xs text-gray-500 mb-2">
+                  Only the first 3 letters will be used for validation.
+                </p>
                 <Input
-                  id="collegeStaffCode"
-                  placeholder="Enter staff college code"
-                  value={collegeStaffCode}
-                  onChange={(e) => setCollegeStaffCode(e.target.value.slice(0, 3))}
-                  maxLength={3}
-                  className="uppercase"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="collegeStudentCode">Student College Code (3 letters)</Label>
-                <Input
-                  id="collegeStudentCode"
-                  placeholder="Enter student college code"
-                  value={collegeStudentCode}
-                  onChange={(e) => setCollegeStudentCode(e.target.value.slice(0, 3))}
-                  maxLength={3}
+                  id="collegeCode"
+                  placeholder="Enter college code"
+                  value={collegeCode}
+                  onChange={(e) => setCollegeCode(e.target.value.slice(0, 8))}
+                  maxLength={8}
                   className="uppercase"
                 />
               </div>
