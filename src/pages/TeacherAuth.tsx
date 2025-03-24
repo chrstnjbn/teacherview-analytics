@@ -8,9 +8,15 @@ import { auth, googleProvider } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
+  const [collegeStaffCode, setCollegeStaffCode] = useState("");
+  const [collegeStudentCode, setCollegeStudentCode] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -67,6 +73,88 @@ const TeacherAuth = () => {
       setIsLoading(false);
     }
   };
+
+  const handleVerifyCollegeCodes = () => {
+    // Validation check - both codes must be exactly 3 characters
+    if (collegeStaffCode.trim().length !== 3 || collegeStudentCode.trim().length !== 3) {
+      toast({
+        title: "Invalid College Codes",
+        description: "Both college codes must be exactly 3 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Verify college codes (in a real app, you would check these against a database)
+    // For now, we'll just ensure they're different from each other
+    if (collegeStaffCode.trim() === collegeStudentCode.trim()) {
+      toast({
+        title: "Invalid College Codes",
+        description: "Staff and student college codes cannot be the same.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Store the college codes in localStorage for future use
+    localStorage.setItem("collegeStaffCode", collegeStaffCode.trim().toUpperCase());
+    localStorage.setItem("collegeStudentCode", collegeStudentCode.trim().toUpperCase());
+    
+    setIsVerified(true);
+    toast({
+      title: "Success",
+      description: "College codes verified. You can now proceed with login.",
+    });
+  };
+
+  if (!isVerified) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">
+        <div className="max-w-md mx-auto">
+          <Card className="p-6">
+            <h1 className="text-2xl font-bold text-center mb-6">Admin Verification</h1>
+            <p className="text-gray-600 mb-6 text-center">
+              Please enter the college codes to proceed.
+            </p>
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="collegeStaffCode">Staff College Code (3 letters)</Label>
+                <Input
+                  id="collegeStaffCode"
+                  placeholder="Enter staff college code"
+                  value={collegeStaffCode}
+                  onChange={(e) => setCollegeStaffCode(e.target.value.slice(0, 3))}
+                  maxLength={3}
+                  className="uppercase"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="collegeStudentCode">Student College Code (3 letters)</Label>
+                <Input
+                  id="collegeStudentCode"
+                  placeholder="Enter student college code"
+                  value={collegeStudentCode}
+                  onChange={(e) => setCollegeStudentCode(e.target.value.slice(0, 3))}
+                  maxLength={3}
+                  className="uppercase"
+                />
+              </div>
+              
+              <Button 
+                onClick={handleVerifyCollegeCodes} 
+                className="w-full"
+                disabled={isLoading}
+              >
+                Verify & Continue
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 py-12 px-4">

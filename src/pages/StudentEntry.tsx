@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,22 +18,43 @@ const StudentEntry = () => {
   const [name, setName] = useState("");
   const [semester, setSemester] = useState("");
   const [collegeCode, setCollegeCode] = useState("");
+  const [savedStudentCode, setSavedStudentCode] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    // Get the student college code set by the admin
+    const storedStudentCode = localStorage.getItem("collegeStudentCode");
+    if (storedStudentCode) {
+      setSavedStudentCode(storedStudentCode);
+    }
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && semester && collegeCode.trim()) {
-      // Store all student information in sessionStorage
-      sessionStorage.setItem("studentName", name.trim());
-      sessionStorage.setItem("studentSemester", semester);
-      sessionStorage.setItem("studentCollegeCode", collegeCode.trim());
+      // Check if the college code matches the stored student code
+      const enteredCode = collegeCode.trim().toUpperCase();
       
-      toast({
-        title: "Success",
-        description: "Welcome! You can now provide feedback.",
-      });
-      navigate("/student/feedback");
+      // If no code is saved (first time setup) or the code matches
+      if (!savedStudentCode || enteredCode.startsWith(savedStudentCode)) {
+        // Store all student information in sessionStorage
+        sessionStorage.setItem("studentName", name.trim());
+        sessionStorage.setItem("studentSemester", semester);
+        sessionStorage.setItem("studentCollegeCode", enteredCode);
+        
+        toast({
+          title: "Success",
+          description: "Welcome! You can now provide feedback.",
+        });
+        navigate("/student/feedback");
+      } else {
+        toast({
+          title: "Invalid College Code",
+          description: `Your college code should start with ${savedStudentCode}`,
+          variant: "destructive",
+        });
+      }
     } else {
       toast({
         title: "Error",
@@ -81,12 +102,18 @@ const StudentEntry = () => {
             
             <div className="space-y-2">
               <Label htmlFor="collegeCode">College Code</Label>
+              {savedStudentCode && (
+                <div className="text-sm text-gray-500 mb-1">
+                  Your college code should start with: {savedStudentCode}
+                </div>
+              )}
               <Input
                 id="collegeCode"
                 placeholder="Enter your college code"
                 value={collegeCode}
                 onChange={(e) => setCollegeCode(e.target.value)}
                 required
+                className="uppercase"
               />
             </div>
             

@@ -1,11 +1,12 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
+import { Label } from "@/components/ui/label";
 
 interface SignUpFormProps {
   isLoading: boolean;
@@ -20,6 +21,7 @@ interface SignUpFormData {
   mobile: string;
   password: string;
   confirmPassword: string;
+  collegeCode: string;
 }
 
 export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFormProps) => {
@@ -29,10 +31,20 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
     email: "",
     mobile: "",
     password: "",
-    confirmPassword: ""
+    confirmPassword: "",
+    collegeCode: ""
   });
+  const [savedStaffCode, setSavedStaffCode] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Get the staff college code set by admin
+    const storedStaffCode = localStorage.getItem("collegeStaffCode");
+    if (storedStaffCode) {
+      setSavedStaffCode(storedStaffCode);
+    }
+  }, []);
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -51,44 +63,54 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
         throw new Error("Passwords do not match");
       }
 
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      // Verify college code
+      const enteredCode = formData.collegeCode.trim().toUpperCase();
+      
+      // If no code is saved (first time setup) or the code matches
+      if (!savedStaffCode || enteredCode.startsWith(savedStaffCode)) {
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          formData.email,
+          formData.password
+        );
 
-      const profileData = {
-        teacherId: "",
-        department: "",
-        subjects: "",
-        courses: "",
-        researchPapers: "",
-        displayName: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        mobile: formData.mobile,
-        uid: userCredential.user.uid
-      };
+        const profileData = {
+          teacherId: "",
+          department: "",
+          subjects: "",
+          courses: "",
+          researchPapers: "",
+          displayName: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          mobile: formData.mobile,
+          uid: userCredential.user.uid,
+          collegeCode: enteredCode
+        };
 
-      const userData = {
-        uid: userCredential.user.uid,
-        email: userCredential.user.email,
-        displayName: `${formData.firstName} ${formData.lastName}`,
-      };
+        const userData = {
+          uid: userCredential.user.uid,
+          email: userCredential.user.email,
+          displayName: `${formData.firstName} ${formData.lastName}`,
+          collegeCode: enteredCode
+        };
 
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('teacherProfile', JSON.stringify(profileData));
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('teacherProfile', JSON.stringify(profileData));
 
-      const existingTeachersData = localStorage.getItem('allTeachers');
-      const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
-      teachers.push(profileData);
-      localStorage.setItem('allTeachers', JSON.stringify(teachers));
+        const existingTeachersData = localStorage.getItem('allTeachers');
+        const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
+        teachers.push(profileData);
+        localStorage.setItem('allTeachers', JSON.stringify(teachers));
 
-      toast({
-        title: "Success",
-        description: "Account created successfully. Please complete your profile.",
-      });
+        toast({
+          title: "Success",
+          description: "Account created successfully. Please complete your profile.",
+        });
 
-      navigate("/teacher/profile");
+        navigate("/teacher/profile");
+      } else {
+        throw new Error("invalid-college-code");
+      }
     } catch (error) {
       console.error("Sign Up Error:", error);
       let errorMessage = "Failed to create account. Please try again.";
@@ -98,6 +120,8 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
           errorMessage = "Email is already registered. Please use a different email.";
         } else if (error.message === "Passwords do not match") {
           errorMessage = error.message;
+        } else if (error.message === "invalid-college-code") {
+          errorMessage = `Invalid college code. Must start with ${savedStaffCode}`;
         }
       }
       
@@ -159,6 +183,22 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn }: SignUpFo
         onChange={handleFormChange}
         required 
       />
+      <div className="space-y-1">
+        {savedStaffCode && (
+          <div className="text-xs text-gray-500 mb-1">
+            College code should start with: {savedStaffCode}
+          </div>
+        )}
+        <Input 
+          name="collegeCode"
+          placeholder="College Code" 
+          value={formData.collegeCode}
+          onChange={handleFormChange}
+          required 
+          className="uppercase"
+          maxLength={6}
+        />
+      </div>
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading ? "Creating Account..." : "Sign Up"}
       </Button>
