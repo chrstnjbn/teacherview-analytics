@@ -13,12 +13,15 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 
 const StudentEntry = () => {
   const [name, setName] = useState("");
   const [semester, setSemester] = useState("");
   const [collegeCode, setCollegeCode] = useState("");
   const [savedStudentCode, setSavedStudentCode] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -30,7 +33,7 @@ const StudentEntry = () => {
     }
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && semester && collegeCode.trim()) {
       // Check if the college code matches the stored student code (first 3 letters)
@@ -38,16 +41,41 @@ const StudentEntry = () => {
       
       // If no code is saved (first time setup) or the code matches
       if (!savedStudentCode || enteredCodePrefix === savedStudentCode) {
-        // Store all student information in sessionStorage
-        sessionStorage.setItem("studentName", name.trim());
-        sessionStorage.setItem("studentSemester", semester);
-        sessionStorage.setItem("studentCollegeCode", collegeCode.trim().toUpperCase());
-        
-        toast({
-          title: "Success",
-          description: "Welcome! You can now provide feedback.",
-        });
-        navigate("/student/feedback");
+        try {
+          setIsSubmitting(true);
+          
+          // Store student information in Firestore
+          const studentData = {
+            name: name.trim(),
+            semester: semester,
+            collegeCode: collegeCode.trim().toUpperCase(),
+            createdAt: serverTimestamp()
+          };
+          
+          // Add document to 'students' collection
+          const docRef = await addDoc(collection(db, "students"), studentData);
+          
+          // Also store in sessionStorage for current session usage
+          sessionStorage.setItem("studentName", name.trim());
+          sessionStorage.setItem("studentSemester", semester);
+          sessionStorage.setItem("studentCollegeCode", collegeCode.trim().toUpperCase());
+          sessionStorage.setItem("studentId", docRef.id);
+          
+          toast({
+            title: "Success",
+            description: "Welcome! You can now provide feedback.",
+          });
+          navigate("/student/feedback");
+        } catch (error) {
+          console.error("Error saving student data:", error);
+          toast({
+            title: "Error",
+            description: "Failed to save student information. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsSubmitting(false);
+        }
       } else {
         toast({
           title: "Invalid College Code",
@@ -117,8 +145,8 @@ const StudentEntry = () => {
               />
             </div>
             
-            <Button type="submit" className="w-full">
-              Continue
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Continue"}
             </Button>
           </form>
         </Card>
