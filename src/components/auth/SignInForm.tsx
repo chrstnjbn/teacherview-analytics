@@ -63,6 +63,11 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
       // First verify college code
       const enteredCode = signInData.collegeCode.trim().toUpperCase();
       
+      // If admin route, verify staff ID is present
+      if (isAdminRoute && !signInData.staffId.trim()) {
+        throw new Error("staff-id-required");
+      }
+      
       // If no code is saved (first time setup) or the code matches
       if (!savedStaffCode || enteredCode.startsWith(savedStaffCode)) {
         const userCredential = await signInWithEmailAndPassword(
@@ -107,6 +112,11 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           localStorage.setItem('allTeachers', JSON.stringify(teachers));
         }
 
+        // Save admin staff ID if on admin route
+        if (isAdminRoute && signInData.staffId.trim()) {
+          localStorage.setItem("adminStaffId", signInData.staffId.trim());
+        }
+
         // Store the current user's profile
         localStorage.setItem('teacherProfile', JSON.stringify(teacher));
         localStorage.setItem('user', JSON.stringify({
@@ -144,6 +154,8 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           errorMessage = "Invalid email format. Please check your email.";
         } else if (error.message === "invalid-college-code") {
           errorMessage = `Invalid college code. Must start with ${savedStaffCode}`;
+        } else if (error.message === "staff-id-required") {
+          errorMessage = "Staff ID is required for admin login.";
         }
       }
       

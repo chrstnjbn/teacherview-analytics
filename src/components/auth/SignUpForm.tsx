@@ -73,6 +73,11 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
         throw new Error("Passwords do not match");
       }
 
+      // If admin route, verify staff ID is present
+      if (isAdminRoute && !formData.staffId.trim()) {
+        throw new Error("staff-id-required");
+      }
+
       // Verify college code
       const enteredCode = formData.collegeCode.trim().toUpperCase();
       
@@ -105,6 +110,11 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           staffId: isAdminRoute ? formData.staffId : ""
         };
 
+        // Save admin staff ID if on admin route
+        if (isAdminRoute && formData.staffId.trim()) {
+          localStorage.setItem("adminStaffId", formData.staffId.trim());
+        }
+
         localStorage.setItem('user', JSON.stringify(userData));
         localStorage.setItem('teacherProfile', JSON.stringify(profileData));
 
@@ -133,6 +143,8 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           errorMessage = error.message;
         } else if (error.message === "invalid-college-code") {
           errorMessage = `Invalid college code. Must start with ${savedStaffCode}`;
+        } else if (error.message === "staff-id-required") {
+          errorMessage = "Staff ID is required for admin registration.";
         }
       }
       
@@ -212,8 +224,10 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
       </div>
       {isAdminRoute && (
         <div className="space-y-1">
+          <Label htmlFor="staffId">Staff ID</Label>
           <Input 
             name="staffId"
+            id="staffId"
             placeholder="Staff ID" 
             value={formData.staffId}
             onChange={handleFormChange}
