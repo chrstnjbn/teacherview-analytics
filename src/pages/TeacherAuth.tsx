@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
@@ -16,7 +15,6 @@ const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [collegeCode, setCollegeCode] = useState("");
-  const [staffId, setStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
@@ -85,29 +83,16 @@ const TeacherAuth = () => {
       });
       return;
     }
-
-    if (isAdminRoute && !staffId.trim()) {
-      toast({
-        title: "Staff ID Required",
-        description: "Please enter your staff ID to continue.",
-        variant: "destructive",
-      });
-      return;
-    }
     
     const codePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
     
     localStorage.setItem("collegeStaffCode", codePrefix);
     localStorage.setItem("collegeStudentCode", codePrefix);
     
-    if (isAdminRoute && staffId.trim()) {
-      localStorage.setItem("adminStaffId", staffId.trim());
-    }
-    
     setIsVerified(true);
     toast({
       title: "Success",
-      description: `College code${isAdminRoute ? " and staff ID" : ""} verified. You can now proceed with login.`,
+      description: "College code verified. You can now proceed with login.",
     });
   };
 
@@ -120,7 +105,7 @@ const TeacherAuth = () => {
               {isAdminRoute ? "Admin Verification" : "Teacher Verification"}
             </h1>
             <p className="text-gray-600 mb-6 text-center">
-              Please enter the college code{isAdminRoute ? " and your staff ID" : ""} to proceed.
+              Please enter the college code to proceed.
             </p>
             
             <div className="space-y-6">
@@ -138,18 +123,6 @@ const TeacherAuth = () => {
                   className="uppercase"
                 />
               </div>
-              
-              {isAdminRoute && (
-                <div className="space-y-2">
-                  <Label htmlFor="staffId">Staff ID</Label>
-                  <Input
-                    id="staffId"
-                    placeholder="Enter your staff ID"
-                    value={staffId}
-                    onChange={(e) => setStaffId(e.target.value)}
-                  />
-                </div>
-              )}
               
               <Button 
                 onClick={handleVerifyCollegeCodes} 
