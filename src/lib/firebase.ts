@@ -28,3 +28,18 @@ googleProvider.setCustomParameters({
 
 // Initialize Firestore
 export const db = getFirestore(app);
+
+// User roles constants
+export const ROLES = {
+  STUDENT: 'student',
+  TEACHER: 'teacher',
+  ADMIN: 'admin',
+};
+
+// Collection names
+export const COLLECTIONS = {
+  USERS: 'users',
+  STUDENTS: 'students',
+  TEACHERS: 'teachers',
+  FEEDBACK: 'feedback',
+};

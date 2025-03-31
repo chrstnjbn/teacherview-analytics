@@ -3,13 +3,14 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { auth, googleProvider } from "@/lib/firebase";
+import { auth, googleProvider, ROLES } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/context/AuthContext";
 
 const TeacherAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +20,7 @@ const TeacherAuth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const isAdminRoute = location.pathname.includes('/admin');
+  const { setUserRole } = useAuth();
 
   const handleGoogleSignIn = async () => {
     try {
@@ -29,21 +31,26 @@ const TeacherAuth = () => {
       const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
       const existingTeacher = teachers.find((t: any) => t.email === result.user.email);
 
+      const role = isAdminRoute ? ROLES.ADMIN : ROLES.TEACHER;
+      await setUserRole(role);
+
       if (existingTeacher) {
         localStorage.setItem('teacherProfile', JSON.stringify(existingTeacher));
         localStorage.setItem('user', JSON.stringify({
           uid: result.user.uid,
           email: result.user.email,
           displayName: result.user.displayName,
+          role: role
         }));
-        navigate("/teacher/dashboard");
+        navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
       } else {
         localStorage.setItem('user', JSON.stringify({
           uid: result.user.uid,
           email: result.user.email,
           displayName: result.user.displayName,
+          role: role
         }));
-        navigate("/teacher/profile");
+        navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/profile");
       }
 
       toast({

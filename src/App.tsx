@@ -1,8 +1,13 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { ROLES } from "@/lib/firebase";
+
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import StudentEntry from "./pages/StudentEntry";
@@ -15,21 +20,48 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <div className="min-h-screen font-sans">
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/student" element={<StudentEntry />} />
-            <Route path="/student/feedback" element={<StudentFeedback />} />
-            <Route path="/teacher/login" element={<TeacherAuth />} />
-            <Route path="/teacher/profile" element={<TeacherProfileForm />} />
-            <Route path="/admin/login" element={<TeacherAuth />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </div>
+      <BrowserRouter>
+        <AuthProvider>
+          <div className="min-h-screen font-sans">
+            <Toaster />
+            <Sonner />
+            <Routes>
+              <Route path="/" element={<Index />} />
+              
+              {/* Student routes */}
+              <Route path="/student" element={<StudentEntry />} />
+              <Route path="/student/feedback" element={
+                <ProtectedRoute allowedRoles={[ROLES.STUDENT]} redirectPath="/student">
+                  <StudentFeedback />
+                </ProtectedRoute>
+              } />
+              
+              {/* Teacher routes */}
+              <Route path="/teacher/login" element={<TeacherAuth />} />
+              <Route path="/teacher/profile" element={
+                <ProtectedRoute allowedRoles={[ROLES.TEACHER]} redirectPath="/teacher/login">
+                  <TeacherProfileForm />
+                </ProtectedRoute>
+              } />
+              <Route path="/teacher/dashboard" element={
+                <ProtectedRoute allowedRoles={[ROLES.TEACHER]} redirectPath="/teacher/login">
+                  <div>Teacher Dashboard (To be implemented)</div>
+                </ProtectedRoute>
+              } />
+              
+              {/* Admin routes */}
+              <Route path="/admin/login" element={<TeacherAuth />} />
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute allowedRoles={[ROLES.ADMIN]} redirectPath="/admin/login">
+                  <div>Admin Dashboard (To be implemented)</div>
+                </ProtectedRoute>
+              } />
+              
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </div>
+        </AuthProvider>
+      </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
 );

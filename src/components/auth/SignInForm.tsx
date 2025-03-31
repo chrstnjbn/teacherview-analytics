@@ -1,11 +1,12 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { auth } from "@/lib/firebase";
+import { auth, ROLES, COLLECTIONS, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { useAuth } from "@/context/AuthContext";
+import { doc, setDoc } from "firebase/firestore";
 
 interface SignInFormProps {
   isLoading: boolean;
@@ -32,15 +33,14 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
   const [savedStaffId, setSavedStaffId] = useState("");
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { setUserRole } = useAuth();
 
   useEffect(() => {
-    // Get the staff college code set by admin
     const storedStaffCode = localStorage.getItem("collegeStaffCode");
     if (storedStaffCode) {
       setSavedStaffCode(storedStaffCode);
     }
     
-    // Get the admin staff ID
     const storedStaffId = localStorage.getItem("adminStaffId");
     if (storedStaffId) {
       setSavedStaffId(storedStaffId);
@@ -60,15 +60,12 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
     setIsLoading(true);
     
     try {
-      // First verify college code
       const enteredCode = signInData.collegeCode.trim().toUpperCase();
       
-      // If admin route, verify staff ID is present
       if (isAdminRoute && !signInData.staffId.trim()) {
         throw new Error("staff-id-required");
       }
       
-      // If no code is saved (first time setup) or the code matches
       if (!savedStaffCode || enteredCode.startsWith(savedStaffCode)) {
         const userCredential = await signInWithEmailAndPassword(
           auth,
@@ -76,13 +73,23 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           signInData.password
         );
 
-        // After successful authentication, check if user exists in our system
+        const role = isAdminRoute ? ROLES.ADMIN : ROLES.TEACHER;
+        
+        await setDoc(doc(db, COLLECTIONS.USERS, userCredential.user.uid), {
+          email: userCredential.user.email,
+          role: role,
+          collegeCode: enteredCode,
+          staffId: isAdminRoute ? signInData.staffId : "",
+          updatedAt: new Date()
+        }, { merge: true });
+        
+        await setUserRole(role);
+
         const existingTeachersData = localStorage.getItem('allTeachers');
         const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
         let teacher = teachers.find((t: any) => t.email === userCredential.user.email);
 
         if (!teacher) {
-          // If teacher doesn't exist in our system, create a new profile
           teacher = {
             teacherId: isAdminRoute ? signInData.staffId : "",
             department: "",
@@ -92,42 +99,40 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
             displayName: userCredential.user.displayName || signInData.email.split('@')[0],
             email: userCredential.user.email,
             uid: userCredential.user.uid,
-            collegeCode: enteredCode
+            collegeCode: enteredCode,
+            role: role
           };
           
-          // Add to allTeachers
           teachers.push(teacher);
           localStorage.setItem('allTeachers', JSON.stringify(teachers));
         } else {
-          // Update the college code if it's not set yet
           if (!teacher.collegeCode) {
             teacher.collegeCode = enteredCode;
           }
           
-          // Update staff ID if it's not set yet and we're on admin route
           if (isAdminRoute && !teacher.teacherId && signInData.staffId) {
             teacher.teacherId = signInData.staffId;
           }
           
+          teacher.role = role;
+          
           localStorage.setItem('allTeachers', JSON.stringify(teachers));
         }
 
-        // Save admin staff ID if on admin route
         if (isAdminRoute && signInData.staffId.trim()) {
           localStorage.setItem("adminStaffId", signInData.staffId.trim());
         }
 
-        // Store the current user's profile
         localStorage.setItem('teacherProfile', JSON.stringify(teacher));
         localStorage.setItem('user', JSON.stringify({
           uid: userCredential.user.uid,
           email: userCredential.user.email,
           displayName: teacher.displayName,
           collegeCode: enteredCode,
-          staffId: isAdminRoute ? (teacher.teacherId || signInData.staffId) : ""
+          staffId: isAdminRoute ? (teacher.teacherId || signInData.staffId) : "",
+          role: role
         }));
 
-        // Navigate based on profile completion
         if (teacher.teacherId) {
           navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
         } else {

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,8 +12,11 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { db } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db, COLLECTIONS, ROLES } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import { auth } from "@/lib/firebase";
+import { signInAnonymously } from "firebase/auth";
+import { useAuth } from "@/context/AuthContext";
 
 const StudentEntry = () => {
   const [name, setName] = useState("");
@@ -24,6 +26,7 @@ const StudentEntry = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { setUserRole, currentUser } = useAuth();
 
   useEffect(() => {
     // Get the student college code set by the admin
@@ -44,16 +47,39 @@ const StudentEntry = () => {
         try {
           setIsSubmitting(true);
           
+          // First, create anonymous auth for the student if not already signed in
+          let userId = currentUser?.uid;
+          
+          if (!currentUser) {
+            const credentials = await signInAnonymously(auth);
+            userId = credentials.user.uid;
+          }
+          
           // Store student information in Firestore
           const studentData = {
             name: name.trim(),
             semester: semester,
             collegeCode: collegeCode.trim().toUpperCase(),
-            createdAt: serverTimestamp()
+            createdAt: serverTimestamp(),
+            userId: userId,
+            role: ROLES.STUDENT
           };
           
           // Add document to 'students' collection
-          const docRef = await addDoc(collection(db, "students"), studentData);
+          const docRef = await addDoc(collection(db, COLLECTIONS.STUDENTS), studentData);
+          
+          // Also set user role in users collection
+          if (userId) {
+            await setDoc(doc(db, COLLECTIONS.USERS, userId), {
+              role: ROLES.STUDENT,
+              displayName: name.trim(),
+              collegeCode: collegeCode.trim().toUpperCase(),
+              updatedAt: new Date()
+            }, { merge: true });
+            
+            // Update role in auth context
+            await setUserRole(ROLES.STUDENT);
+          }
           
           // Also store in sessionStorage for current session usage
           sessionStorage.setItem("studentName", name.trim());
