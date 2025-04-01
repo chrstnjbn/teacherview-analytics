@@ -38,7 +38,7 @@ const TeacherProfileForm = () => {
 
   useEffect(() => {
     // Check if user exists and has a complete profile
-    if (existingProfile && existingProfile.teacherId && !isEditing) {
+    if (existingProfile?.teacherId && !isEditing) {
       // If they have a complete profile and we're not editing, go to dashboard
       navigate("/teacher/dashboard");
     }

@@ -62,11 +62,11 @@ const StudentFeedback = () => {
         );
         
         const querySnapshot = await getDocs(q);
-        querySnapshot.forEach((doc) => {
+        for (const doc of querySnapshot.docs) {
           const teacherData = doc.data() as TeacherInfo;
           teacherData.uid = doc.id;
           registeredTeachers.push(teacherData);
-        });
+        }
       } catch (error) {
         console.error("Error loading teachers from Firestore:", error);
       }

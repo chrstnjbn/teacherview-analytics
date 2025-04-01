@@ -1,6 +1,8 @@
 
-import { createContext, useContext, ReactNode } from 'react';
-import { useRoleAuth, UserWithRole } from '@/hooks/useRoleAuth';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
+import { useRoleAuth } from '@/hooks/useRoleAuth';
+import type { UserWithRole } from '@/hooks/useRoleAuth';
 
 interface AuthContextType {
   currentUser: UserWithRole | null;

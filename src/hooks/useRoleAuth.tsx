@@ -1,7 +1,8 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { auth, db, ROLES, COLLECTIONS } from '@/lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +33,7 @@ export const useRoleAuth = (): UseRoleAuthReturn => {
   const { toast } = useToast();
 
   // Save user role to Firestore
-  const saveUserRole = async (user: User, role: string): Promise<void> => {
+  const saveUserRole = useCallback(async (user: User, role: string): Promise<void> => {
     if (!user) return;
 
     try {
@@ -51,7 +52,7 @@ export const useRoleAuth = (): UseRoleAuthReturn => {
         variant: "destructive",
       });
     }
-  };
+  }, [toast]);
 
   // Set user role (can be called from other components)
   const setUserRoleFunction = async (role: string): Promise<void> => {
@@ -127,7 +128,7 @@ export const useRoleAuth = (): UseRoleAuthReturn => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [saveUserRole]);
 
   return {
     currentUser,

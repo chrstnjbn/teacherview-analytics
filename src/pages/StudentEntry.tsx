@@ -4,16 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue 
+  SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { db, COLLECTIONS, ROLES } from "@/lib/firebase";
-import { collection, addDoc, serverTimestamp, doc, setDoc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  doc,
+  setDoc,
+} from "firebase/firestore";
 import { auth } from "@/lib/firebase";
 import { signInAnonymously } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
@@ -39,64 +45,87 @@ const StudentEntry = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && semester && collegeCode.trim()) {
-      // Check if the college code matches the stored student code (first 3 letters)
-      const enteredCodePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
-      
-      // If no code is saved (first time setup) or the code matches
+      const enteredCodePrefix = collegeCode
+        .trim()
+        .substring(0, 3)
+        .toUpperCase();
+
       if (!savedStudentCode || enteredCodePrefix === savedStudentCode) {
         try {
           setIsSubmitting(true);
-          
-          // First, create anonymous auth for the student if not already signed in
-          let userId = currentUser?.uid;
-          
-          if (!currentUser) {
+
+          // Step 1: Handle authentication
+          let authUser = currentUser;
+          if (!authUser) {
             const credentials = await signInAnonymously(auth);
-            userId = credentials.user.uid;
+            // Wait a moment for auth state to update
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            authUser = credentials.user;
           }
-          
-          // Store student information in Firestore
+
+          if (!authUser?.uid) {
+            throw new Error("Authentication failed");
+          }
+
+          // Step 2: Create user document with minimal data first
+          const userDocRef = doc(db, COLLECTIONS.USERS, authUser.uid);
+          await setDoc(userDocRef, {
+            role: ROLES.STUDENT,
+            displayName: name.trim(),
+            collegeCode: collegeCode.trim().toUpperCase(),
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            isAnonymous: true,
+          });
+
+          // Step 3: Wait a moment for the user document to be created
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Step 4: Create student document
           const studentData = {
             name: name.trim(),
             semester: semester,
             collegeCode: collegeCode.trim().toUpperCase(),
             createdAt: serverTimestamp(),
-            userId: userId,
-            role: ROLES.STUDENT
+            userId: authUser.uid,
+            role: ROLES.STUDENT,
           };
-          
-          // Add document to 'students' collection
-          const docRef = await addDoc(collection(db, COLLECTIONS.STUDENTS), studentData);
-          
-          // Also set user role in users collection
-          if (userId) {
-            await setDoc(doc(db, COLLECTIONS.USERS, userId), {
-              role: ROLES.STUDENT,
-              displayName: name.trim(),
-              collegeCode: collegeCode.trim().toUpperCase(),
-              updatedAt: new Date()
-            }, { merge: true });
-            
-            // Update role in auth context
-            await setUserRole(ROLES.STUDENT);
+
+          const studentRef = collection(db, COLLECTIONS.STUDENTS);
+          const docRef = await addDoc(studentRef, studentData);
+
+          // Update context and session storage
+          await setUserRole(ROLES.STUDENT);
+
+          const sessionData = {
+            studentName: name.trim(),
+            studentSemester: semester,
+            studentCollegeCode: collegeCode.trim().toUpperCase(),
+            studentId: docRef.id,
+          };
+
+          for (const [key, value] of Object.entries(sessionData)) {
+            sessionStorage.setItem(key, value);
           }
-          
-          // Also store in sessionStorage for current session usage
-          sessionStorage.setItem("studentName", name.trim());
-          sessionStorage.setItem("studentSemester", semester);
-          sessionStorage.setItem("studentCollegeCode", collegeCode.trim().toUpperCase());
-          sessionStorage.setItem("studentId", docRef.id);
-          
+
           toast({
             title: "Success",
             description: "Welcome! You can now provide feedback.",
           });
           navigate("/student/feedback");
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error saving student data:", error);
+          let errorMessage =
+            "Failed to save student information. Please try again.";
+
+          if (error.code === "permission-denied") {
+            errorMessage =
+              "Authentication error. Please refresh and try again.";
+          }
+
           toast({
             title: "Error",
-            description: "Failed to save student information. Please try again.",
+            description: errorMessage,
             variant: "destructive",
           });
         } finally {
@@ -134,7 +163,7 @@ const StudentEntry = () => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="semester">Current Semester</Label>
               <Select value={semester} onValueChange={setSemester} required>
@@ -153,7 +182,7 @@ const StudentEntry = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
               {savedStudentCode && (
@@ -170,7 +199,7 @@ const StudentEntry = () => {
                 className="uppercase"
               />
             </div>
-            
+
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Continue"}
             </Button>

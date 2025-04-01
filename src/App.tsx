@@ -14,6 +14,8 @@ import StudentEntry from "./pages/StudentEntry";
 import TeacherAuth from "./pages/TeacherAuth";
 import TeacherProfileForm from "./pages/TeacherProfileForm";
 import StudentFeedback from "./pages/StudentFeedback";
+import TeacherDashboard from "./pages/TeacherDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -45,7 +47,7 @@ const App = () => (
               } />
               <Route path="/teacher/dashboard" element={
                 <ProtectedRoute allowedRoles={[ROLES.TEACHER]} redirectPath="/teacher/login">
-                  <div>Teacher Dashboard (To be implemented)</div>
+                  <TeacherDashboard />
                 </ProtectedRoute>
               } />
               
@@ -53,7 +55,7 @@ const App = () => (
               <Route path="/admin/login" element={<TeacherAuth />} />
               <Route path="/admin/dashboard" element={
                 <ProtectedRoute allowedRoles={[ROLES.ADMIN]} redirectPath="/admin/login">
-                  <div>Admin Dashboard (To be implemented)</div>
+                  <AdminDashboard />
                 </ProtectedRoute>
               } />
               
