@@ -37,9 +37,7 @@ const TeacherProfileForm = () => {
   const existingProfile = profileData ? JSON.parse(profileData) : null;
 
   useEffect(() => {
-    // Check if user exists and has a complete profile
     if (existingProfile?.teacherId && !isEditing) {
-      // If they have a complete profile and we're not editing, go to dashboard
       navigate("/teacher/dashboard");
     }
   }, [existingProfile, isEditing, navigate]);
@@ -59,17 +57,14 @@ const TeacherProfileForm = () => {
     try {
       setIsLoading(true);
       
-      // Create the profile data
       const updatedProfile = {
         ...existingProfile,
         ...values,
         displayName: user?.displayName || 'Teacher',
       };
 
-      // Store individual teacher profile
       localStorage.setItem('teacherProfile', JSON.stringify(updatedProfile));
       
-      // Update in all teachers array
       const existingTeachersString = localStorage.getItem('allTeachers');
       const existingTeachers = existingTeachersString ? JSON.parse(existingTeachersString) : [];
       

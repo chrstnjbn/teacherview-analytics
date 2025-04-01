@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { Label } from "@/components/ui/label";
+import { AuthHeader } from "./AuthHeader";
+import { GoogleIcon } from "@/components/ui/icons";
 
 interface SignUpFormProps {
   isLoading: boolean;
@@ -25,7 +25,12 @@ interface SignUpFormData {
   staffId: string;
 }
 
-export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRoute = false }: SignUpFormProps) => {
+export const SignUpForm = ({
+  isLoading,
+  setIsLoading,
+  onGoogleSignIn,
+  isAdminRoute = false,
+}: SignUpFormProps) => {
   const [formData, setFormData] = useState<SignUpFormData>({
     firstName: "",
     lastName: "",
@@ -34,7 +39,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
     password: "",
     confirmPassword: "",
     collegeCode: "",
-    staffId: ""
+    staffId: "",
   });
   const [savedStaffCode, setSavedStaffCode] = useState("");
   const [savedStaffId, setSavedStaffId] = useState("");
@@ -42,45 +47,33 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get the staff college code set by admin
     const storedStaffCode = localStorage.getItem("collegeStaffCode");
     if (storedStaffCode) {
       setSavedStaffCode(storedStaffCode);
     }
-    
-    // Get the admin staff ID
+
     const storedStaffId = localStorage.getItem("adminStaffId");
     if (storedStaffId) {
       setSavedStaffId(storedStaffId);
     }
   }, []);
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       if (formData.password !== formData.confirmPassword) {
         throw new Error("Passwords do not match");
       }
 
-      // If admin route, verify staff ID is present
       if (isAdminRoute && !formData.staffId.trim()) {
         throw new Error("staff-id-required");
       }
 
-      // Verify college code
       const enteredCode = formData.collegeCode.trim().toUpperCase();
-      
-      // If no code is saved (first time setup) or the code matches
+
       if (!savedStaffCode || enteredCode.startsWith(savedStaffCode)) {
         const userCredential = await createUserWithEmailAndPassword(
           auth,
@@ -98,7 +91,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           email: formData.email,
           mobile: formData.mobile,
           uid: userCredential.user.uid,
-          collegeCode: enteredCode
+          collegeCode: enteredCode,
         };
 
         const userData = {
@@ -106,25 +99,27 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           email: userCredential.user.email,
           displayName: `${formData.firstName} ${formData.lastName}`,
           collegeCode: enteredCode,
-          staffId: isAdminRoute ? formData.staffId : ""
+          staffId: isAdminRoute ? formData.staffId : "",
         };
 
-        // Save admin staff ID if on admin route
         if (isAdminRoute && formData.staffId.trim()) {
           localStorage.setItem("adminStaffId", formData.staffId.trim());
         }
 
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('teacherProfile', JSON.stringify(profileData));
+        localStorage.setItem("user", JSON.stringify(userData));
+        localStorage.setItem("teacherProfile", JSON.stringify(profileData));
 
-        const existingTeachersData = localStorage.getItem('allTeachers');
-        const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
+        const existingTeachersData = localStorage.getItem("allTeachers");
+        const teachers = existingTeachersData
+          ? JSON.parse(existingTeachersData)
+          : [];
         teachers.push(profileData);
-        localStorage.setItem('allTeachers', JSON.stringify(teachers));
+        localStorage.setItem("allTeachers", JSON.stringify(teachers));
 
         toast({
           title: "Success",
-          description: "Account created successfully. Please complete your profile.",
+          description:
+            "Account created successfully. Please complete your profile.",
         });
 
         navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/profile");
@@ -134,10 +129,11 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
     } catch (error) {
       console.error("Sign Up Error:", error);
       let errorMessage = "Failed to create account. Please try again.";
-      
+
       if (error instanceof Error) {
-        if (error.message.includes('auth/email-already-in-use')) {
-          errorMessage = "Email is already registered. Please use a different email.";
+        if (error.message.includes("auth/email-already-in-use")) {
+          errorMessage =
+            "Email is already registered. Please use a different email.";
         } else if (error.message === "Passwords do not match") {
           errorMessage = error.message;
         } else if (error.message === "invalid-college-code") {
@@ -146,7 +142,7 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           errorMessage = "Staff ID is required for admin registration.";
         }
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -158,96 +154,44 @@ export const SignUpForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
   };
 
   return (
-    <form onSubmit={handleSignUp} className="space-y-4">
-      <Input 
-        name="firstName"
-        placeholder="First Name" 
-        value={formData.firstName}
-        onChange={handleFormChange}
-        required 
+    <div className="w-full max-w-md mx-auto space-y-6">
+      <AuthHeader
+        title={
+          isAdminRoute ? "Administrator Registration" : "Faculty Registration"
+        }
+        subtitle="Join your institution's academic portal"
+        isLoading={isLoading}
       />
-      <Input 
-        name="lastName"
-        placeholder="Last Name" 
-        value={formData.lastName}
-        onChange={handleFormChange}
-        required 
-      />
-      <Input 
-        name="email"
-        type="email" 
-        placeholder="Email" 
-        value={formData.email}
-        onChange={handleFormChange}
-        required 
-      />
-      <Input 
-        name="mobile"
-        type="tel" 
-        placeholder="Mobile Number" 
-        value={formData.mobile}
-        onChange={handleFormChange}
-        required 
-      />
-      <Input 
-        name="password"
-        type="password" 
-        placeholder="Password" 
-        value={formData.password}
-        onChange={handleFormChange}
-        required 
-      />
-      <Input 
-        name="confirmPassword"
-        type="password" 
-        placeholder="Confirm Password" 
-        value={formData.confirmPassword}
-        onChange={handleFormChange}
-        required 
-      />
-      <div className="space-y-1">
-        {savedStaffCode && (
-          <div className="text-xs text-gray-500 mb-1">
-            College code should start with: {savedStaffCode}
-          </div>
-        )}
-        <Input 
-          name="collegeCode"
-          placeholder="College Code" 
-          value={formData.collegeCode}
-          onChange={handleFormChange}
-          required 
-          className="uppercase"
-          maxLength={8}
-        />
-      </div>
-      {isAdminRoute && (
-        <div className="space-y-1">
-          <Label htmlFor="staffId">Staff ID</Label>
-          <Input 
-            name="staffId"
-            id="staffId"
-            placeholder="Staff ID" 
-            value={formData.staffId}
-            onChange={handleFormChange}
-            required 
-          />
+
+      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md">
+          <p className="text-sm text-center text-blue-700">
+            Register using your institutional email address
+          </p>
         </div>
-      )}
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Creating Account..." : "Sign Up"}
-      </Button>
-      <div className="text-center">
-        <Button 
-          variant="outline" 
-          className="w-full mt-2"
+
+        <Button
+          variant="outline"
+          className="w-full h-11 font-medium relative"
           onClick={onGoogleSignIn}
           disabled={isLoading}
           type="button"
         >
-          {isLoading ? "Signing up..." : "Sign up with Google"}
+          {!isLoading && <GoogleIcon />}
+          <span className="mx-auto">
+            {isLoading ? "Setting up account..." : "Register with Google"}
+          </span>
         </Button>
+
+        <div className="text-xs text-center space-y-1 text-muted-foreground">
+          <p>Only institutional email addresses are allowed</p>
+          {isAdminRoute && (
+            <p className="font-medium">
+              Administrative access requires approval
+            </p>
+          )}
+        </div>
       </div>
-    </form>
+    </div>
   );
 };

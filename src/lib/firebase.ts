@@ -13,30 +13,24 @@ const firebaseConfig = {
   measurementId: "G-8J0EL5RHCC"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Auth with specific settings
 export const auth = getAuth(app);
-auth.useDeviceLanguage(); // Use the device's language
+auth.useDeviceLanguage(); 
 
-// Initialize Google Auth Provider with custom parameters
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
-  prompt: 'select_account' // Always prompt for account selection
+  prompt: 'select_account' 
 });
 
-// Initialize Firestore
 export const db = getFirestore(app);
 
-// User roles constants
 export const ROLES = {
   STUDENT: 'student',
   TEACHER: 'teacher',
   ADMIN: 'admin',
 };
 
-// Collection names
 export const COLLECTIONS = {
   USERS: 'users',
   STUDENTS: 'students',

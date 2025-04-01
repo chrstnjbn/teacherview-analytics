@@ -1,13 +1,99 @@
-import React, { useEffect, useRef } from "react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
 import Chart from "chart.js/auto";
+import toast from "react-hot-toast";
 
 const TeacherDashboard: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
   const performanceChartRef = useRef<HTMLCanvasElement>(null);
   const ratingChartRef = useRef<HTMLCanvasElement>(null);
 
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("user");
+      localStorage.removeItem("teacherProfile");
+      localStorage.removeItem("profilePic");
+      window.location.href = "/";
+      toast.success("Logged out successfully");
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout");
+    }
+  };
+
   useEffect(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      const teacherProfile = localStorage.getItem("teacherProfile");
+      const storedProfilePic = localStorage.getItem("profilePic");
+
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        const parsedProfile = teacherProfile
+          ? JSON.parse(teacherProfile)
+          : null;
+        setUser({
+          ...parsedUser,
+          ...parsedProfile,
+          initials:
+            parsedUser.displayName
+              ?.split(" ")
+              .map((n: string) => n[0])
+              .join("") || "U",
+        });
+
+        if (storedProfilePic) {
+          setProfilePic(storedProfilePic);
+        }
+
+        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
+          icon: "👋",
+          duration: 3000,
+          position: "top-center",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      toast.error("Failed to load user data");
+    }
+
     initCharts();
   }, []);
+
+  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const base64String = reader.result as string;
+        setProfilePic(base64String);
+        localStorage.setItem("profilePic", base64String);
+        toast.success("Profile picture updated successfully");
+      } catch (error) {
+        toast.error("Failed to update profile picture");
+        console.error("Profile pic update error:", error);
+      }
+    };
+
+    reader.onerror = () => {
+      toast.error("Failed to read image file");
+    };
+
+    reader.readAsDataURL(file);
+  };
 
   const initCharts = () => {
     if (performanceChartRef.current && ratingChartRef.current) {
@@ -116,18 +202,80 @@ const TeacherDashboard: React.FC = () => {
                 </span>
               </div>
               <div className="flex items-center">
-                <img
-                  className="w-10 h-10 rounded-full"
-                  src="https://ui-avatars.com/api/?name=Priya+Kumar&background=ec4899&color=fff"
-                  alt="Teacher"
-                />
+                <div className="relative group">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePicChange}
+                    className="hidden"
+                    id="profile-pic-input"
+                  />
+                  <label
+                    htmlFor="profile-pic-input"
+                    className="cursor-pointer relative block"
+                  >
+                    <img
+                      className="w-10 h-10 rounded-full object-cover"
+                      src={
+                        profilePic ||
+                        user?.photoURL ||
+                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                          user?.displayName || "User"
+                        )}&background=ec4899&color=fff`
+                      }
+                      alt={user?.displayName || "User"}
+                    />
+                    <div className="absolute inset-0 rounded-full bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <svg
+                        className="w-5 h-5 text-white"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    </div>
+                  </label>
+                </div>
                 <div className="ml-3">
                   <div className="text-sm font-medium text-gray-900">
-                    Dr. Priya Kumar
+                    {user?.displayName || "Loading..."}
                   </div>
-                  <div className="text-xs text-gray-500">Professor</div>
+                  <div className="text-xs text-gray-500">
+                    {user?.designation || "Teacher"}
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={handleLogout}
+                className="ml-4 flex items-center px-3 py-2 border border-pink-500 text-pink-500 hover:bg-pink-50 rounded-lg transition-colors text-sm"
+              >
+                <svg
+                  className="w-4 h-4 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+                <span className="hidden sm:inline">Logout</span>
+              </button>
             </div>
           </div>
         </div>

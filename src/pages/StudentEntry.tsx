@@ -35,7 +35,6 @@ const StudentEntry = () => {
   const { setUserRole, currentUser } = useAuth();
 
   useEffect(() => {
-    // Get the student college code set by the admin
     const storedStudentCode = localStorage.getItem("collegeStudentCode");
     if (storedStudentCode) {
       setSavedStudentCode(storedStudentCode);
@@ -54,20 +53,26 @@ const StudentEntry = () => {
         try {
           setIsSubmitting(true);
 
-          // Step 1: Handle authentication
           let authUser = currentUser;
           if (!authUser) {
-            const credentials = await signInAnonymously(auth);
-            // Wait a moment for auth state to update
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            authUser = credentials.user;
+            try {
+              const credentials = await signInAnonymously(auth);
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              authUser = credentials.user;
+            } catch (authError: any) {
+              if (authError.code === "auth/admin-restricted-operation") {
+                throw new Error(
+                  "Anonymous authentication is not enabled. Please contact the administrator."
+                );
+              }
+              throw authError;
+            }
           }
 
           if (!authUser?.uid) {
             throw new Error("Authentication failed");
           }
 
-          // Step 2: Create user document with minimal data first
           const userDocRef = doc(db, COLLECTIONS.USERS, authUser.uid);
           await setDoc(userDocRef, {
             role: ROLES.STUDENT,
@@ -78,10 +83,8 @@ const StudentEntry = () => {
             isAnonymous: true,
           });
 
-          // Step 3: Wait a moment for the user document to be created
           await new Promise((resolve) => setTimeout(resolve, 500));
 
-          // Step 4: Create student document
           const studentData = {
             name: name.trim(),
             semester: semester,
@@ -94,7 +97,6 @@ const StudentEntry = () => {
           const studentRef = collection(db, COLLECTIONS.STUDENTS);
           const docRef = await addDoc(studentRef, studentData);
 
-          // Update context and session storage
           await setUserRole(ROLES.STUDENT);
 
           const sessionData = {
@@ -121,10 +123,12 @@ const StudentEntry = () => {
           if (error.code === "permission-denied") {
             errorMessage =
               "Authentication error. Please refresh and try again.";
+          } else if (error.message.includes("Anonymous authentication")) {
+            errorMessage = error.message;
           }
 
           toast({
-            title: "Error",
+            title: "Authentication Error",
             description: errorMessage,
             variant: "destructive",
           });

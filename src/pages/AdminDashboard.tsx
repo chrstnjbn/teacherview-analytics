@@ -1,6 +1,7 @@
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
+import toast from "react-hot-toast";
 
 interface NavItem {
   icon: string;
@@ -8,13 +9,87 @@ interface NavItem {
   href: string;
 }
 
+interface User {
+  displayName: string;
+  photoURL?: string;
+  role?: string;
+}
+
 const AdminDashboard: React.FC = () => {
   const [activeNav, setActiveNav] = useState("dashboard");
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const performanceChartRef = useRef<Chart | null>(null);
+  const ratingChartRef = useRef<Chart | null>(null);
 
   useEffect(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      const adminProfile = localStorage.getItem("adminProfile");
+      const storedProfilePic = localStorage.getItem("profilePic");
+
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        const parsedProfile = adminProfile ? JSON.parse(adminProfile) : null;
+        setUser({
+          ...parsedUser,
+          ...parsedProfile,
+          role: "Administrator",
+        });
+
+        if (storedProfilePic) {
+          setProfilePic(storedProfilePic);
+        }
+
+        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
+          icon: "👋",
+          duration: 3000,
+          position: "top-center",
+        });
+      }
+    } catch (error) {
+      console.error("Error loading user data:", error);
+      toast.error("Failed to load user data");
+    }
+
     initCharts();
   }, []);
+
+  const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image size should be less than 5MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const base64String = reader.result as string;
+        setProfilePic(base64String);
+        localStorage.setItem("profilePic", base64String);
+        toast.success("Profile picture updated successfully");
+      } catch (error) {
+        toast.error("Failed to update profile picture");
+        console.error("Profile pic update error:", error);
+      }
+    };
+
+    reader.onerror = () => {
+      toast.error("Failed to read image file");
+    };
+
+    reader.readAsDataURL(file);
+  };
 
   const initCharts = () => {
     const performanceCtx = document.getElementById(
@@ -25,7 +100,14 @@ const AdminDashboard: React.FC = () => {
     ) as HTMLCanvasElement;
 
     if (performanceCtx && ratingCtx) {
-      new Chart(performanceCtx, {
+      if (performanceChartRef.current) {
+        performanceChartRef.current.destroy();
+      }
+      if (ratingChartRef.current) {
+        ratingChartRef.current.destroy();
+      }
+
+      performanceChartRef.current = new Chart(performanceCtx, {
         type: "line",
         data: {
           labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
@@ -59,7 +141,7 @@ const AdminDashboard: React.FC = () => {
         },
       });
 
-      new Chart(ratingCtx, {
+      ratingChartRef.current = new Chart(ratingCtx, {
         type: "doughnut",
         data: {
           labels: ["5 Stars", "4 Stars", "3 Stars", "2 Stars", "1 Star"],
@@ -91,6 +173,17 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (performanceChartRef.current) {
+        performanceChartRef.current.destroy();
+      }
+      if (ratingChartRef.current) {
+        ratingChartRef.current.destroy();
+      }
+    };
+  }, []);
+
   const handleNavClick = (
     e: React.MouseEvent<HTMLAnchorElement>,
     label: string
@@ -99,48 +192,50 @@ const AdminDashboard: React.FC = () => {
     setActiveNav(label.toLowerCase());
   };
 
-  const renderNavItem = ({ icon, label, href }: NavItem) => (
-    <a
-      key={label}
-      href={href}
-      onClick={(e) => handleNavClick(e, label)}
-      className={`flex items-center px-4 py-3 text-gray-700 rounded-lg mb-2 transition-colors ${
-        activeNav === label.toLowerCase() ? "bg-gray-100" : "hover:bg-gray-100"
-      }`}
-      aria-label={label}
-    >
-      <i className={`${icon} w-5`} />
-      <span className="ml-3">{label}</span>
-    </a>
-  );
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("user");
+      localStorage.removeItem("adminProfile");
+      localStorage.removeItem("profilePic");
+
+      toast.success("Logged out successfully");
+
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout");
+    }
+  };
 
   const navItems: NavItem[] = [
     { icon: "fas fa-home", label: "Dashboard", href: "#" },
     { icon: "fas fa-chart-line", label: "Analytics", href: "#" },
-    { icon: "fas fa-users", label: "Students", href: "#" },
+    { icon: "fas fa-graduation-cap", label: "Students", href: "#" },
     { icon: "fas fa-chalkboard-teacher", label: "Faculty", href: "#" },
+    { icon: "fas fa-book", label: "Courses", href: "#" },
+    { icon: "fas fa-cog", label: "Settings", href: "#" },
   ];
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
+    <div className="flex h-screen overflow-hidden bg-gray-100">
       <button
         type="button"
-        className="md:hidden fixed top-4 left-4 z-20 p-3 rounded-lg bg-white shadow-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-all duration-200"
+        className="md:hidden fixed top-4 left-4 z-50 p-3 rounded-lg bg-white shadow-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         onClick={() => setSidebarOpen(!isSidebarOpen)}
       >
-        <div className="w-6 h-5 relative flex flex-col justify-between">
+        <div className="w-6 h-5 flex flex-col justify-between">
           <span
-            className={`w-full h-0.5 bg-gray-600 rounded-full transform transition-all duration-300 ${
-              isSidebarOpen ? "rotate-45 translate-y-2" : ""
+            className={`block w-full h-0.5 bg-gray-600 transition-transform duration-300 ease-in-out ${
+              isSidebarOpen ? "rotate-45 translate-y-2.5" : ""
             }`}
           />
           <span
-            className={`w-full h-0.5 bg-gray-600 rounded-full transition-all duration-300 ${
+            className={`block w-full h-0.5 bg-gray-600 transition-opacity duration-300 ease-in-out ${
               isSidebarOpen ? "opacity-0" : ""
             }`}
           />
           <span
-            className={`w-full h-0.5 bg-gray-600 rounded-full transform transition-all duration-300 ${
+            className={`block w-full h-0.5 bg-gray-600 transition-transform duration-300 ease-in-out ${
               isSidebarOpen ? "-rotate-45 -translate-y-2" : ""
             }`}
           />
@@ -149,34 +244,98 @@ const AdminDashboard: React.FC = () => {
 
       <div
         className={`
-        fixed md:static inset-y-0 left-0 transform ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }
-        md:translate-x-0 transition-transform duration-300 ease-in-out
-        w-64 bg-white shadow-xl z-10
-      `}
+          fixed inset-0 bg-gray-900/50 z-40 md:hidden
+          transition-opacity duration-300 ease-in-out
+          ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}
+        `}
+        onClick={() => setSidebarOpen(false)}
+      />
+
+      <div
+        className={`
+          fixed md:static inset-y-0 left-0 transform ${
+            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+          }
+          md:translate-x-0 transition-transform duration-300 ease-in-out
+          w-64 bg-white shadow-xl z-40 flex flex-col h-full
+        `}
       >
-        <div className="flex items-center p-6 border-b">
-          <img
-            className="w-12 h-12 rounded-full"
-            src="https://ui-avatars.com/api/?name=Christina&background=4f46e5&color=fff"
-            alt="User"
-          />
-          <div className="ml-4">
-            <h3 className="font-semibold text-gray-800">Christina</h3>
-            <p className="text-sm text-gray-600">Administrator</p>
+        <div className="p-6 border-b">
+          <div className="flex items-center space-x-4">
+            <div className="relative group">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePicChange}
+                className="hidden"
+                id="profile-pic-input"
+              />
+              <label
+                htmlFor="profile-pic-input"
+                className="cursor-pointer relative block"
+              >
+                <img
+                  className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-600"
+                  src={
+                    profilePic ||
+                    user?.photoURL ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      user?.displayName || "User"
+                    )}&background=4f46e5&color=fff`
+                  }
+                  alt={user?.displayName || "User"}
+                />
+                <div className="absolute inset-0 rounded-full bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                  <i className="fas fa-camera text-white text-sm" />
+                </div>
+              </label>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-semibold text-gray-900 truncate">
+                {user?.displayName || "Loading..."}
+              </h2>
+              <p className="text-xs text-gray-500 truncate">
+                {user?.role || "Administrator"}
+              </p>
+            </div>
           </div>
         </div>
-        <nav className="p-4">
-          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4">
-            Main
+
+        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+          <div className="space-y-2">
+            {navItems.map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                onClick={(e) => handleNavClick(e, item.label)}
+                className={`
+                  flex items-center px-4 py-3 text-sm font-medium rounded-lg
+                  transition-colors duration-150 ease-in-out
+                  ${
+                    activeNav === item.label.toLowerCase()
+                      ? "bg-indigo-50 text-indigo-600"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                  }
+                `}
+              >
+                <i className={`${item.icon} w-5 h-5`} />
+                <span className="ml-3">{item.label}</span>
+              </a>
+            ))}
           </div>
-          {navItems.slice(0, 2).map(renderNavItem)}
-          <div className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-4 mt-6">
-            Management
-          </div>
-          {navItems.slice(2).map(renderNavItem)}
         </nav>
+
+        <div className="p-4 border-t">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex items-center w-full px-4 py-3 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors duration-150 ease-in-out group"
+          >
+            <i className="fas fa-sign-out-alt w-5 h-5 group-hover:text-red-600" />
+            <span className="ml-3 group-hover:text-red-600">Logout</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto">
@@ -200,14 +359,22 @@ const AdminDashboard: React.FC = () => {
               <div className="flex items-center">
                 <img
                   className="w-10 h-10 rounded-full"
-                  src="https://ui-avatars.com/api/?name=Christina&background=4f46e5&color=fff"
-                  alt="User"
+                  src={
+                    profilePic ||
+                    user?.photoURL ||
+                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                      user?.displayName || "Admin"
+                    )}&background=4f46e5&color=fff`
+                  }
+                  alt={user?.displayName || "User"}
                 />
                 <div className="ml-3">
                   <div className="text-sm font-semibold text-gray-800">
-                    Christina
+                    {user?.displayName || "Loading..."}
                   </div>
-                  <div className="text-xs text-gray-600">Administrator</div>
+                  <div className="text-xs text-gray-600">
+                    {user?.role || "Administrator"}
+                  </div>
                 </div>
               </div>
             </div>
@@ -221,7 +388,8 @@ const AdminDashboard: React.FC = () => {
                 Dashboard Overview
               </h1>
               <p className="text-gray-600">
-                Welcome back, Christina! Here's what's happening today.
+                Welcome back, {user?.displayName?.split(" ")[0] || "Admin"}!
+                Here's what's happening today.
               </p>
             </div>
             <button

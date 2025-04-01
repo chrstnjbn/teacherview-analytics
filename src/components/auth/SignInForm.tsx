@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { auth, ROLES, COLLECTIONS, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { useAuth } from "@/context/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
+import { AuthHeader } from "./AuthHeader";
+import { GoogleIcon } from "@/components/ui/icons";
 
 interface SignInFormProps {
   isLoading: boolean;
@@ -22,12 +23,17 @@ interface SignInFormData {
   staffId: string;
 }
 
-export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRoute = false }: SignInFormProps) => {
+export const SignInForm = ({
+  isLoading,
+  setIsLoading,
+  onGoogleSignIn,
+  isAdminRoute = false,
+}: SignInFormProps) => {
   const [signInData, setSignInData] = useState<SignInFormData>({
     email: "",
     password: "",
     collegeCode: "",
-    staffId: ""
+    staffId: "",
   });
   const [savedStaffCode, setSavedStaffCode] = useState("");
   const [savedStaffId, setSavedStaffId] = useState("");
@@ -40,32 +46,24 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
     if (storedStaffCode) {
       setSavedStaffCode(storedStaffCode);
     }
-    
+
     const storedStaffId = localStorage.getItem("adminStaffId");
     if (storedStaffId) {
       setSavedStaffId(storedStaffId);
     }
   }, []);
 
-  const handleSignInChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setSignInData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
       const enteredCode = signInData.collegeCode.trim().toUpperCase();
-      
+
       if (isAdminRoute && !signInData.staffId.trim()) {
         throw new Error("staff-id-required");
       }
-      
+
       if (!savedStaffCode || enteredCode.startsWith(savedStaffCode)) {
         const userCredential = await signInWithEmailAndPassword(
           auth,
@@ -74,20 +72,28 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
         );
 
         const role = isAdminRoute ? ROLES.ADMIN : ROLES.TEACHER;
-        
-        await setDoc(doc(db, COLLECTIONS.USERS, userCredential.user.uid), {
-          email: userCredential.user.email,
-          role: role,
-          collegeCode: enteredCode,
-          staffId: isAdminRoute ? signInData.staffId : "",
-          updatedAt: new Date()
-        }, { merge: true });
-        
+
+        await setDoc(
+          doc(db, COLLECTIONS.USERS, userCredential.user.uid),
+          {
+            email: userCredential.user.email,
+            role: role,
+            collegeCode: enteredCode,
+            staffId: isAdminRoute ? signInData.staffId : "",
+            updatedAt: new Date(),
+          },
+          { merge: true }
+        );
+
         await setUserRole(role);
 
-        const existingTeachersData = localStorage.getItem('allTeachers');
-        const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
-        let teacher = teachers.find((t: any) => t.email === userCredential.user.email);
+        const existingTeachersData = localStorage.getItem("allTeachers");
+        const teachers = existingTeachersData
+          ? JSON.parse(existingTeachersData)
+          : [];
+        let teacher = teachers.find(
+          (t: any) => t.email === userCredential.user.email
+        );
 
         if (!teacher) {
           teacher = {
@@ -96,42 +102,48 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
             subjects: "",
             courses: "",
             researchPapers: "",
-            displayName: userCredential.user.displayName || signInData.email.split('@')[0],
+            displayName:
+              userCredential.user.displayName || signInData.email.split("@")[0],
             email: userCredential.user.email,
             uid: userCredential.user.uid,
             collegeCode: enteredCode,
-            role: role
+            role: role,
           };
-          
+
           teachers.push(teacher);
-          localStorage.setItem('allTeachers', JSON.stringify(teachers));
+          localStorage.setItem("allTeachers", JSON.stringify(teachers));
         } else {
           if (!teacher.collegeCode) {
             teacher.collegeCode = enteredCode;
           }
-          
+
           if (isAdminRoute && !teacher.teacherId && signInData.staffId) {
             teacher.teacherId = signInData.staffId;
           }
-          
+
           teacher.role = role;
-          
-          localStorage.setItem('allTeachers', JSON.stringify(teachers));
+
+          localStorage.setItem("allTeachers", JSON.stringify(teachers));
         }
 
         if (isAdminRoute && signInData.staffId.trim()) {
           localStorage.setItem("adminStaffId", signInData.staffId.trim());
         }
 
-        localStorage.setItem('teacherProfile', JSON.stringify(teacher));
-        localStorage.setItem('user', JSON.stringify({
-          uid: userCredential.user.uid,
-          email: userCredential.user.email,
-          displayName: teacher.displayName,
-          collegeCode: enteredCode,
-          staffId: isAdminRoute ? (teacher.teacherId || signInData.staffId) : "",
-          role: role
-        }));
+        localStorage.setItem("teacherProfile", JSON.stringify(teacher));
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            uid: userCredential.user.uid,
+            email: userCredential.user.email,
+            displayName: teacher.displayName,
+            collegeCode: enteredCode,
+            staffId: isAdminRoute
+              ? teacher.teacherId || signInData.staffId
+              : "",
+            role: role,
+          })
+        );
 
         if (teacher.teacherId) {
           navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
@@ -149,13 +161,14 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
     } catch (error) {
       console.error("Sign In Error:", error);
       let errorMessage = "Invalid email or password. Please try again.";
-      
+
       if (error instanceof Error) {
-        if (error.message.includes('auth/user-not-found')) {
-          errorMessage = "No account found with this email. Please sign up first.";
-        } else if (error.message.includes('auth/wrong-password')) {
+        if (error.message.includes("auth/user-not-found")) {
+          errorMessage =
+            "No account found with this email. Please sign up first.";
+        } else if (error.message.includes("auth/wrong-password")) {
           errorMessage = "Incorrect password. Please try again.";
-        } else if (error.message.includes('auth/invalid-email')) {
+        } else if (error.message.includes("auth/invalid-email")) {
           errorMessage = "Invalid email format. Please check your email.";
         } else if (error.message === "invalid-college-code") {
           errorMessage = `Invalid college code. Must start with ${savedStaffCode}`;
@@ -163,7 +176,7 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
           errorMessage = "Staff ID is required for admin login.";
         }
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -175,77 +188,41 @@ export const SignInForm = ({ isLoading, setIsLoading, onGoogleSignIn, isAdminRou
   };
 
   return (
-    <form onSubmit={handleSignIn} className="space-y-4">
-      <div className="space-y-2">
-        <Input 
-          type="email" 
-          name="email"
-          placeholder="Email" 
-          value={signInData.email}
-          onChange={handleSignInChange}
-          required 
-          className="w-full"
-        />
-        <Input 
-          type="password" 
-          name="password"
-          placeholder="Password" 
-          value={signInData.password}
-          onChange={handleSignInChange}
-          required 
-          className="w-full"
-        />
-        <div className="space-y-1">
-          {savedStaffCode && (
-            <div className="text-xs text-gray-500 mb-1">
-              College code should start with: {savedStaffCode}
-            </div>
-          )}
-          <Input 
-            type="text" 
-            name="collegeCode"
-            placeholder="College Code" 
-            value={signInData.collegeCode}
-            onChange={handleSignInChange}
-            required 
-            className="w-full uppercase"
-            maxLength={8}
-          />
+    <div className="w-full max-w-md mx-auto space-y-6">
+      <AuthHeader
+        title={isAdminRoute ? "Administrator Access" : "Faculty Portal"}
+        subtitle={`Welcome back to ${
+          savedStaffCode || "your institution"
+        }'s portal`}
+        isLoading={isLoading}
+      />
+
+      <div className="bg-white p-6 rounded-lg border shadow-sm space-y-4">
+        <div className="p-3 bg-blue-50 border border-blue-100 rounded-md">
+          <p className="text-sm text-center text-blue-700">
+            Sign in with your institutional email address
+          </p>
         </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-11 font-medium relative"
+          onClick={onGoogleSignIn}
+          disabled={isLoading}
+        >
+          {!isLoading && <GoogleIcon />}
+          <span className="mx-auto">
+            {isLoading ? "Authenticating..." : "Sign in with Google"}
+          </span>
+        </Button>
+
         {isAdminRoute && (
-          <div className="space-y-1">
-            <Input 
-              type="text" 
-              name="staffId"
-              placeholder="Staff ID" 
-              value={signInData.staffId}
-              onChange={handleSignInChange}
-              required 
-              className="w-full"
-            />
-          </div>
+          <p className="text-xs text-center text-muted-foreground">
+            Administrator access requires additional verification
+          </p>
         )}
       </div>
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading ? "Signing in..." : "Sign In"}
-      </Button>
-      <div className="relative my-4">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-        </div>
-      </div>
-      <Button 
-        type="button"
-        variant="outline" 
-        className="w-full"
-        onClick={onGoogleSignIn}
-        disabled={isLoading}
-      >
-        {isLoading ? "Signing in..." : "Google"}
-      </Button>
-    </form>
+    </div>
   );
 };

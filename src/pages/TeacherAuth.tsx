@@ -19,58 +19,77 @@ const TeacherAuth = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const isAdminRoute = location.pathname.includes('/admin');
+  const isAdminRoute = location.pathname.includes("/admin");
   const { setUserRole } = useAuth();
 
   const handleGoogleSignIn = async () => {
     try {
       setIsLoading(true);
       const result = await signInWithPopup(auth, googleProvider);
-      
-      const existingTeachersData = localStorage.getItem('allTeachers');
-      const teachers = existingTeachersData ? JSON.parse(existingTeachersData) : [];
-      const existingTeacher = teachers.find((t: any) => t.email === result.user.email);
 
       const role = isAdminRoute ? ROLES.ADMIN : ROLES.TEACHER;
-      await setUserRole(role);
+
+      if (setUserRole) {
+        setUserRole(role);
+      }
+
+      const existingTeachersData = localStorage.getItem("allTeachers");
+      const teachers = existingTeachersData
+        ? JSON.parse(existingTeachersData)
+        : [];
+      const existingTeacher = teachers.find(
+        (t: any) => t.email === result.user.email
+      );
 
       if (existingTeacher) {
-        localStorage.setItem('teacherProfile', JSON.stringify(existingTeacher));
-        localStorage.setItem('user', JSON.stringify({
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          role: role
-        }));
+        localStorage.setItem("teacherProfile", JSON.stringify(existingTeacher));
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            role: role,
+          })
+        );
         navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
       } else {
-        localStorage.setItem('user', JSON.stringify({
-          uid: result.user.uid,
-          email: result.user.email,
-          displayName: result.user.displayName,
-          role: role
-        }));
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            uid: result.user.uid,
+            email: result.user.email,
+            displayName: result.user.displayName,
+            role: role,
+          })
+        );
         navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/profile");
       }
 
       toast({
-        title: `Welcome${result.user.displayName ? ` ${result.user.displayName}` : ''}!`,
-        description: existingTeacher ? "Successfully signed in." : "Please complete your profile.",
+        title: `Welcome${
+          result.user.displayName ? ` ${result.user.displayName}` : ""
+        }!`,
+        description: existingTeacher
+          ? "Successfully signed in."
+          : "Please complete your profile.",
       });
     } catch (error) {
       console.error("Google Sign In Error:", error);
       let errorMessage = "Failed to sign in with Google. Please try again.";
-      
+
       if (error instanceof Error) {
-        if (error.message.includes('popup-closed-by-user')) {
+        if (error.message.includes("popup-closed-by-user")) {
           errorMessage = "Sign-in cancelled. Please try again.";
-        } else if (error.message.includes('auth/network-request-failed')) {
-          errorMessage = "Network error. Please check your internet connection.";
-        } else if (error.message.includes('auth/popup-blocked')) {
-          errorMessage = "Popup was blocked. Please allow popups for this site.";
+        } else if (error.message.includes("auth/network-request-failed")) {
+          errorMessage =
+            "Network error. Please check your internet connection.";
+        } else if (error.message.includes("auth/popup-blocked")) {
+          errorMessage =
+            "Popup was blocked. Please allow popups for this site.";
         }
       }
-      
+
       toast({
         title: "Error",
         description: errorMessage,
@@ -90,12 +109,12 @@ const TeacherAuth = () => {
       });
       return;
     }
-    
+
     const codePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
-    
+
     localStorage.setItem("collegeStaffCode", codePrefix);
     localStorage.setItem("collegeStudentCode", codePrefix);
-    
+
     setIsVerified(true);
     toast({
       title: "Success",
@@ -114,7 +133,7 @@ const TeacherAuth = () => {
             <p className="text-gray-600 mb-6 text-center">
               Please enter the college code to proceed.
             </p>
-            
+
             <div className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
@@ -130,9 +149,9 @@ const TeacherAuth = () => {
                   className="uppercase"
                 />
               </div>
-              
-              <Button 
-                onClick={handleVerifyCollegeCodes} 
+
+              <Button
+                onClick={handleVerifyCollegeCodes}
                 className="w-full"
                 disabled={isLoading}
               >
@@ -154,9 +173,9 @@ const TeacherAuth = () => {
               <TabsTrigger value="signin">Sign In</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="signin">
-              <SignInForm 
+              <SignInForm
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
                 onGoogleSignIn={handleGoogleSignIn}
@@ -165,7 +184,7 @@ const TeacherAuth = () => {
             </TabsContent>
 
             <TabsContent value="signup">
-              <SignUpForm 
+              <SignUpForm
                 isLoading={isLoading}
                 setIsLoading={setIsLoading}
                 onGoogleSignIn={handleGoogleSignIn}

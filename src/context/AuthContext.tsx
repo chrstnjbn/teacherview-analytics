@@ -1,27 +1,19 @@
+import { createContext, useContext, useState } from "react";
 
-import { createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
-import { useRoleAuth } from '@/hooks/useRoleAuth';
-import type { UserWithRole } from '@/hooks/useRoleAuth';
-
-interface AuthContextType {
-  currentUser: UserWithRole | null;
-  isLoading: boolean;
+type AuthContextType = {
   userRole: string | null;
-  isAdmin: boolean;
-  isTeacher: boolean;
-  isStudent: boolean;
-  setUserRole: (role: string) => Promise<void>;
-  checkUserAccess: (allowedRoles: string[]) => boolean;
-}
+  setUserRole: (role: string) => void;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const auth = useRoleAuth();
-  
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   return (
-    <AuthContext.Provider value={auth}>
+    <AuthContext.Provider value={{ userRole, setUserRole }}>
       {children}
     </AuthContext.Provider>
   );
@@ -30,7 +22,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
