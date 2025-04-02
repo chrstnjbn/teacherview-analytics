@@ -22,7 +22,9 @@ interface TeacherInfo {
   displayName: string;
   department: string;
   subjects: string;
+  teacherId: string;
   uid?: string;
+  role: string;
 }
 
 interface FeedbackForm {
@@ -59,50 +61,65 @@ const StudentFeedback = () => {
     }
 
     const loadTeachers = async () => {
-      const registeredTeachers: TeacherInfo[] = [];
-
       try {
+        console.log("Loading teachers for college code:", collegeCode);
+
         const q = query(
-          collection(db, "teachers"),
+          collection(db, "users"),
           where("collegeCode", "==", collegeCode)
         );
 
         const querySnapshot = await getDocs(q);
-        for (const doc of querySnapshot.docs) {
-          const teacherData = doc.data() as TeacherInfo;
-          teacherData.uid = doc.id;
-          registeredTeachers.push(teacherData);
+        console.log("Total users found:", querySnapshot.size);
+        const registeredTeachers: TeacherInfo[] = [];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          console.log("Checking user data:", {
+            id: doc.id,
+            role: data.role,
+            displayName: data.displayName,
+          });
+
+          if (
+            data.role &&
+            (data.role.toLowerCase() === "teacher" ||
+              data.role.toLowerCase().includes("teacher"))
+          ) {
+            console.log("Found teacher:", data);
+            registeredTeachers.push({
+              uid: doc.id,
+              displayName: data.displayName || "Unknown Teacher",
+              department: data.department || "Not specified",
+              subjects: data.subjects || "Not specified",
+              teacherId: data.teacherId || doc.id,
+              role: data.role,
+            } as TeacherInfo);
+          } else {
+            console.log("Skipping non-teacher user with role:", data.role);
+          }
+        });
+
+        console.log("Processed teachers:", registeredTeachers);
+
+        if (registeredTeachers.length > 0) {
+          setTeachers(registeredTeachers);
+        } else {
+          console.log("No teachers found with role 'teacher'");
+          toast({
+            title: "No Teachers Found",
+            description:
+              "No teachers found for your college. Please verify teacher accounts.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
-        console.error("Error loading teachers from Firestore:", error);
-      }
-
-      if (registeredTeachers.length === 0) {
-        const storedTeacherInfo = localStorage.getItem("teacherProfile");
-        if (storedTeacherInfo) {
-          const teacherData = JSON.parse(storedTeacherInfo);
-          console.log("Individual teacher data loaded:", teacherData);
-          registeredTeachers.push(teacherData);
-        }
-
-        const allTeachersString = localStorage.getItem("allTeachers");
-        if (allTeachersString) {
-          const allTeachers = JSON.parse(allTeachersString);
-          console.log("All teachers data loaded:", allTeachers);
-          registeredTeachers.push(...allTeachers);
-        }
-      }
-
-      if (registeredTeachers.length > 0) {
-        const uniqueTeachers = Array.from(
-          new Map(
-            registeredTeachers.map((teacher) => [teacher.displayName, teacher])
-          ).values()
-        );
-        console.log("Final unique teachers list:", uniqueTeachers);
-        setTeachers(uniqueTeachers);
-      } else {
-        console.log("No teacher data found in localStorage or Firestore");
+        console.error("Error loading teachers:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load teachers. Please try again later.",
+          variant: "destructive",
+        });
       }
     };
 

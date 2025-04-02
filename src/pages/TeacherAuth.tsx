@@ -3,8 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { auth, googleProvider, ROLES } from "@/lib/firebase";
+import { auth, googleProvider, ROLES, db } from "@/lib/firebase";
 import { signInWithPopup } from "firebase/auth";
+import { getDoc, doc } from "firebase/firestore";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { SignUpForm } from "@/components/auth/SignUpForm";
 import { Input } from "@/components/ui/input";
@@ -33,46 +34,24 @@ const TeacherAuth = () => {
         setUserRole(role);
       }
 
-      const existingTeachersData = localStorage.getItem("allTeachers");
-      const teachers = existingTeachersData
-        ? JSON.parse(existingTeachersData)
-        : [];
-      const existingTeacher = teachers.find(
-        (t: any) => t.email === result.user.email
-      );
+      const userDocRef = doc(db, "users", result.user.uid);
+      const userDocSnap = await getDoc(userDocRef);
 
-      if (existingTeacher) {
-        localStorage.setItem("teacherProfile", JSON.stringify(existingTeacher));
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            uid: result.user.uid,
-            email: result.user.email,
-            displayName: result.user.displayName,
-            role: role,
-          })
-        );
-        navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
-      } else {
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            uid: result.user.uid,
-            email: result.user.email,
-            displayName: result.user.displayName,
-            role: role,
-          })
-        );
-        navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/profile");
+      if (!userDocSnap.exists() || userDocSnap.data().role !== role) {
+        navigate(isAdminRoute ? "/admin/login" : "/teacher/login");
+        toast({
+          title: "Account Not Found",
+          description: "Please sign up to create an account.",
+          variant: "destructive",
+        });
+        return;
       }
-
+      navigate(isAdminRoute ? "/admin/dashboard" : "/teacher/dashboard");
       toast({
-        title: `Welcome${
+        title: `Welcome back${
           result.user.displayName ? ` ${result.user.displayName}` : ""
         }!`,
-        description: existingTeacher
-          ? "Successfully signed in."
-          : "Please complete your profile.",
+        description: "Successfully signed in.",
       });
     } catch (error) {
       console.error("Google Sign In Error:", error);
@@ -112,9 +91,6 @@ const TeacherAuth = () => {
 
     const codePrefix = collegeCode.trim().substring(0, 3).toUpperCase();
 
-    localStorage.setItem("collegeStaffCode", codePrefix);
-    localStorage.setItem("collegeStudentCode", codePrefix);
-
     setIsVerified(true);
     toast({
       title: "Success",
@@ -136,10 +112,7 @@ const TeacherAuth = () => {
 
             <div className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
-                <p className="text-xs text-gray-500 mb-2">
-                  Only the first 3 letters will be used for validation.
-                </p>
+                <Label htmlFor="collegeCode">College Code </Label>
                 <Input
                   id="collegeCode"
                   placeholder="Enter college code"

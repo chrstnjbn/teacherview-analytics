@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Chart from "chart.js/auto";
 import toast from "react-hot-toast";
 import { collection, query, where, getDocs } from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { db } from "../lib/firebase";
 
 interface FeedbackData {
@@ -13,6 +14,16 @@ interface FeedbackData {
   teacherResponse?: string;
   timestamp: { seconds: number; nanoseconds: number };
   teacherUid: string;
+  approachable: boolean;
+  collegeCode: string;
+  effectiveMethods: boolean;
+  explanationClarity: string;
+  studentId: string;
+  studentName: string;
+  submittedAt: { seconds: number; nanoseconds: number };
+  suggestedChanges: string;
+  teacherName: string;
+  teachingQuality: string;
 }
 
 const TeacherDashboard: React.FC = () => {
@@ -34,6 +45,7 @@ const TeacherDashboard: React.FC = () => {
     responseRate: 0,
     activeCourses: new Set(),
   });
+  const [loading, setLoading] = useState(true);
   const performanceChartRef = useRef<HTMLCanvasElement>(null);
   const ratingChartRef = useRef<HTMLCanvasElement>(null);
 
@@ -153,9 +165,6 @@ const TeacherDashboard: React.FC = () => {
 
   const handleLogout = () => {
     try {
-      localStorage.removeItem("user");
-      localStorage.removeItem("teacherProfile");
-      localStorage.removeItem("profilePic");
       window.location.href = "/";
       toast.success("Logged out successfully");
     } catch (error) {
@@ -245,7 +254,6 @@ const TeacherDashboard: React.FC = () => {
       try {
         const base64String = reader.result as string;
         setProfilePic(base64String);
-        localStorage.setItem("profilePic", base64String);
         toast.success("Profile picture updated successfully");
       } catch (error) {
         toast.error("Failed to update profile picture");
@@ -260,53 +268,64 @@ const TeacherDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const fetchRatingsData = async (userId: string) => {
+  const fetchTeacherData = async (email: string) => {
+    try {
+      const usersRef = collection(db, "users");
+      const teacherQuery = query(
+        usersRef,
+        where("email", "==", email.toLowerCase())
+      );
+
+      const teacherSnapshot = await getDocs(teacherQuery);
+
+      if (teacherSnapshot.empty) {
+        toast.error("No user found with this email");
+        return null;
+      }
+
+      const teacherDoc = teacherSnapshot.docs[0];
+      const teacherData = teacherDoc.data();
+
+      if (teacherData.role !== "teacher") {
+        toast.error("User is not a teacher");
+        return null;
+      }
+
+      setUser({
+        ...teacherData,
+        id: teacherDoc.id,
+        initials:
+          teacherData.displayName
+            ?.split(" ")
+            .map((n: string) => n[0])
+            .join("") || "U",
+      });
+
+      toast.success("Teacher data loaded successfully");
+      return teacherDoc.id;
+    } catch (error) {
+      console.error("Error fetching teacher data:", error);
+      toast.error("Failed to fetch teacher data");
+      return null;
+    }
+  };
+
+  const fetchRatingsData = async (teacherId: string) => {
     try {
       const ratingsRef = collection(db, "feedback");
-      const cleanUserId = userId.trim();
-      console.log("Cleaned User ID:", cleanUserId);
-
-      const userIdVariations = [
-        cleanUserId,
-        cleanUserId.toLowerCase(),
-        cleanUserId.toUpperCase(),
-        `${cleanUserId} `,
-        `${cleanUserId.toLowerCase()} `,
-        `${cleanUserId.toUpperCase()} `,
-      ];
-
-      const allDocs = await getDocs(collection(db, "feedback"));
-      console.log(
-        "All feedback documents:",
-        allDocs.docs.map((doc) => {
-          const data = doc.data();
-          console.log("Document data:", data);
-          return {
-            id: doc.id,
-            teacherUid: data.teacherUid,
-            ...data,
-          };
-        })
+      const feedbackQuery = query(
+        ratingsRef,
+        where("teacherUid", "==", teacherId)
       );
-
-      const q = query(ratingsRef, where("teacherUid", "in", userIdVariations));
 
       toast.loading("Loading feedback data...", { id: "feedback-loading" });
-      console.log(
-        "Executing query with teacherUid variations:",
-        userIdVariations
-      );
 
-      const querySnapshot = await getDocs(q);
-      console.log("Query executed, documents found:", querySnapshot.size);
-
-      querySnapshot.forEach((doc) => {
-        console.log("Matching document:", doc.id, doc.data());
-      });
+      const querySnapshot = await getDocs(feedbackQuery);
+      console.log("Feedback documents found:", querySnapshot.size);
 
       const ratingsData: FeedbackData[] = [];
 
-      querySnapshot.forEach((doc) => {
+      for (const doc of querySnapshot.docs) {
         const data = doc.data();
         const normalizedRating = Math.min(Math.max(Number(data.rating), 1), 5);
 
@@ -314,30 +333,28 @@ const TeacherDashboard: React.FC = () => {
           id: doc.id,
           ...data,
           rating: normalizedRating,
-          timestamp: data.timestamp || {
-            seconds: Date.now() / 1000,
-            nanoseconds: 0,
-          },
+          timestamp: data.submittedAt ||
+            data.timestamp || {
+              seconds: Date.now() / 1000,
+              nanoseconds: 0,
+            },
+          approachable: data.approachable || false,
+          collegeCode: data.collegeCode || "",
+          effectiveMethods: data.effectiveMethods || false,
+          explanationClarity: data.explanationClarity || "Not specified",
+          studentId: data.studentId || "",
+          studentName: data.studentName || "Anonymous",
+          submittedAt: data.submittedAt || data.timestamp,
+          suggestedChanges: data.suggestedChanges || "",
+          teacherName: data.teacherName || "",
+          teachingQuality: data.teachingQuality || "Not specified",
         } as FeedbackData);
-      });
-
-      console.log("Processed ratings data:", ratingsData);
+      }
 
       toast.dismiss("feedback-loading");
 
       if (ratingsData.length === 0) {
-        if (allDocs.empty) {
-          toast.error("The feedback collection is empty.");
-        } else {
-          toast.error(
-            "No feedback found for this teacher. Please verify the teacher ID and data structure."
-          );
-        }
-        console.log("Expected teacherUid format:", {
-          provided: cleanUserId,
-          lowercase: cleanUserId.toLowerCase(),
-          uppercase: cleanUserId.toUpperCase(),
-        });
+        toast.info("No feedback found for this teacher");
         return;
       }
 
@@ -349,23 +366,19 @@ const TeacherDashboard: React.FC = () => {
       setAverageRating(avgRating);
 
       const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-      ratingsData.forEach((rating) => {
+      for (const rating of ratingsData) {
         const ratingKey = Math.min(
           Math.max(Math.round(rating.rating), 1),
           5
         ) as 1 | 2 | 3 | 4 | 5;
         distribution[ratingKey]++;
-      });
+      }
 
-      const sortedRatings = ratingsData.sort((a, b) => {
-        const timestampA = a.timestamp?.seconds || 0;
-        const timestampB = b.timestamp?.seconds || 0;
-        return timestampB - timestampA;
-      });
+      const sortedRatings = ratingsData.sort(
+        (a, b) => b.timestamp.seconds - a.timestamp.seconds
+      );
 
       setRatingDistribution(distribution);
-      const recentFeedback = sortedRatings.slice(0, 2);
-      console.log("Recent feedback:", recentFeedback);
       setLatestFeedback(getLatestFeedback(sortedRatings));
       setRatings(sortedRatings);
       calculateTrends(sortedRatings);
@@ -377,20 +390,8 @@ const TeacherDashboard: React.FC = () => {
 
       toast.success("Data loaded successfully");
     } catch (error) {
-      console.error("Error fetching ratings:", error);
-      if (error instanceof Error) {
-        const errorMessage = error.message.includes("permission")
-          ? "Access denied. Please make sure you are logged in and have the correct permissions."
-          : "Failed to load ratings data. Please try again later.";
-
-        console.error("Error details:", {
-          message: error.message,
-          stack: error.stack,
-          name: error.name,
-        });
-
-        toast.error(errorMessage);
-      }
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load data. Please try again later.");
     }
   };
 
@@ -458,6 +459,40 @@ const TeacherDashboard: React.FC = () => {
   };
 
   useEffect(() => {
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        if (firebaseUser.email) {
+          setLoading(true);
+          try {
+            toast.loading("Loading teacher data...", { id: "teacher-loading" });
+
+            const teacherId = await fetchTeacherData(firebaseUser.email);
+            if (teacherId) {
+              await fetchRatingsData(teacherId);
+            } else {
+              throw new Error("Could not fetch teacher data");
+            }
+          } catch (error) {
+            console.error("Error initializing dashboard:", error);
+            toast.error("Failed to initialize dashboard");
+          } finally {
+            toast.dismiss("teacher-loading");
+            setLoading(false);
+          }
+        } else {
+          toast.error("No email associated with account");
+          setLoading(false);
+        }
+      } else {
+        window.location.href = "/login";
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
     if (ratings.length > 0) {
       initCharts();
     }
@@ -471,174 +506,90 @@ const TeacherDashboard: React.FC = () => {
     };
   }, [ratings, ratingDistribution, initCharts]);
 
-  useEffect(() => {
-    try {
-      const userData = localStorage.getItem("user");
-      const teacherProfile = localStorage.getItem("teacherProfile");
-      const storedProfilePic = localStorage.getItem("profilePic");
-
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        console.log("User data from localStorage:", parsedUser);
-        console.log("User ID to be used:", parsedUser.uid);
-
-        if (!parsedUser.uid) {
-          toast.error("User ID not found");
-          return;
-        }
-
-        const parsedProfile = teacherProfile
-          ? JSON.parse(teacherProfile)
-          : null;
-        setUser({
-          ...parsedUser,
-          ...parsedProfile,
-          initials:
-            parsedUser.displayName
-              ?.split(" ")
-              .map((n: string) => n[0])
-              .join("") || "U",
-        });
-
-        if (storedProfilePic) {
-          setProfilePic(storedProfilePic);
-        }
-
-        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
-          icon: "👋",
-          duration: 3000,
-          position: "top-center",
-        });
-
-        fetchRatingsData(parsedUser.uid);
-      }
-    } catch (error) {
-      console.error("Error in useEffect:", error);
-      toast.error("Failed to initialize dashboard");
-    }
-  }, []);
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto" />
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between py-2 sm:py-4 md:h-16 md:py-0">
-            <div className="flex items-center w-full md:w-auto mb-2 md:mb-0">
-              <div className="relative w-full md:w-64">
-                <input
-                  type="text"
-                  placeholder="Search reviews..."
-                  className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                />
-                <svg
-                  className="h-5 w-5 text-gray-400 absolute left-3 top-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <h1 className="text-xl font-bold text-gray-900">
+                PerformEdge
+              </h1>
             </div>
-            <div className="flex items-center justify-between md:justify-end">
-              <div className="relative mr-4">
-                <svg
-                  className="h-6 w-6 text-gray-600"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.5V11a6 6 0 10-12 0v3.5c0 .538-.214 1.055-.595 1.405L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <div className="relative">
+                {profilePic ? (
+                  <img
+                    src={profilePic}
+                    alt="Profile"
+                    className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover border-2 border-pink-500"
                   />
-                </svg>
-                <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                  2
-                </span>
-              </div>
-              <div className="flex items-center">
-                <div className="relative group">
+                ) : (
+                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-pink-100 flex items-center justify-center border-2 border-pink-500">
+                    <span className="text-sm sm:text-base font-medium text-pink-500">
+                      {user?.initials}
+                    </span>
+                  </div>
+                )}
+                <label className="absolute -bottom-1 -right-1 cursor-pointer">
                   <input
                     type="file"
+                    className="hidden"
                     accept="image/*"
                     onChange={handleProfilePicChange}
-                    className="hidden"
-                    id="profile-pic-input"
                   />
-                  <label
-                    htmlFor="profile-pic-input"
-                    className="cursor-pointer relative block"
-                  >
-                    <img
-                      className="w-10 h-10 rounded-full object-cover"
-                      src={
-                        profilePic ||
-                        user?.photoURL ||
-                        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                          user?.displayName || "User"
-                        )}&background=ec4899&color=fff`
-                      }
-                      alt={user?.displayName || "User"}
-                    />
-                    <div className="absolute inset-0 rounded-full bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <svg
-                        className="w-5 h-5 text-white"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                    </div>
-                  </label>
-                </div>
-                <div className="ml-3">
-                  <div className="text-sm font-medium text-gray-900">
-                    {user?.displayName || "Loading..."}
+                  <div className="h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-pink-500 text-white flex items-center justify-center text-xs shadow-lg hover:bg-pink-600 transition-colors">
+                    <svg
+                      className="h-2.5 w-2.5 sm:h-3 sm:w-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 4v16m8-8H4"
+                      />
+                    </svg>
                   </div>
-                  <div className="text-xs text-gray-500">
-                    {user?.designation || "Teacher"}
-                  </div>
-                </div>
+                </label>
               </div>
-              <button
-                onClick={handleLogout}
-                className="ml-4 flex items-center px-3 py-2 border border-pink-500 text-pink-500 hover:bg-pink-50 rounded-lg transition-colors text-sm"
-              >
-                <svg
-                  className="w-4 h-4 mr-2"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-1 sm:space-y-0 sm:space-x-4">
+                <span className="text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+                  {user?.displayName}
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center px-2 sm:px-3 py-1 sm:py-2 border border-pink-500 text-pink-500 hover:bg-pink-50 rounded-lg transition-colors text-xs sm:text-sm whitespace-nowrap"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                  />
-                </svg>
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+                  <svg
+                    className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -647,7 +598,7 @@ const TeacherDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 md:mb-8">
           <div className="mb-4 md:mb-0">
             <h1 className="text-xl md:text-2xl font-bold text-gray-900">
-              My Teaching Dashboard
+              Faculty Dashboard
             </h1>
             <p className="text-sm md:text-base text-gray-600">
               Track your performance and student feedback
@@ -689,7 +640,7 @@ const TeacherDashboard: React.FC = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.036 6.29a1 1 0 00.95.69h6.6c.969 0 1.371 1.24.588 1.81l-5.347 3.89a1 1 0 00-.364 1.118l2.036 6.29c.3.921-.755 1.688-1.54 1.118l-5.347-3.89a1 1 0 00-1.176 0l-5.347 3.89c-.784.57-1.838-.197-1.54-1.118l2.036-6.29a1 1 0 00-.364-1.118L2.414 11.717c-.783-.57-.381-1.81.588-1.81h6.6a1 1 0 00.95-.69l2.036-6.29z"
+                    d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.036 6.29a1 1 0 00.95.69h6.6c.969 0 1.371 1.24.588 1.81l-5.347 3.89a1 1 0 00-.364 1.118l2.036 6.29c.3.921-.755 1.688-1.54 1.118l-5.347-3.89a1 1 0 00-1.176 0l-5.347-3.89c-.784.57-1.838-.197-1.54-1.118l2.036-6.29a1 1 0 00-.364-1.118L2.414 11.717c-.783-.57-.381-1.81.588-1.81h6.6a1 1 0 00.95-.69l2.036-6.29z"
                   />
                 </svg>
               </div>
@@ -782,9 +733,7 @@ const TeacherDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-2">
-              89.5% 
-            </div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">89.5%</div>
             <div className="flex items-center text-gray-500 text-sm">
               Based on total feedback
             </div>
@@ -875,7 +824,7 @@ const TeacherDashboard: React.FC = () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                      {feedback.courseId}
+                      {feedback.collegeCode} - {feedback.studentName}
                     </span>
                     <div className="flex items-center">
                       <div className="flex items-center text-yellow-400">
@@ -900,8 +849,21 @@ const TeacherDashboard: React.FC = () => {
                     </div>
                   </div>
                   <p className="text-sm text-gray-600">"{feedback.comment}"</p>
-                  <span className="text-xs text-gray-400">
-                    {feedback.timeAgo}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      Teaching: {feedback.teachingQuality}
+                    </span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
+                      Clarity: {feedback.explanationClarity}
+                    </span>
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                      Approachable: {feedback.approachable ? "Yes" : "No"}
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400 block mt-2">
+                    {new Date(
+                      feedback.submittedAt.seconds * 1000
+                    ).toLocaleString()}
                   </span>
                 </div>
               ))}
