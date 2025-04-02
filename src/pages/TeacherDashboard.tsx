@@ -1,13 +1,155 @@
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Chart from "chart.js/auto";
 import toast from "react-hot-toast";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { db } from "../lib/firebase";
+
+interface FeedbackData {
+  id: string;
+  rating: number;
+  comment: string;
+  courseId: string;
+  teacherResponse?: string;
+  timestamp: { seconds: number; nanoseconds: number };
+  teacherUid: string;
+}
 
 const TeacherDashboard: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [ratings, setRatings] = useState<FeedbackData[]>([]);
+  const [averageRating, setAverageRating] = useState(0);
+  const [latestFeedback, setLatestFeedback] = useState<FeedbackData[]>([]);
+  const [ratingDistribution, setRatingDistribution] = useState({
+    5: 0,
+    4: 0,
+    3: 0,
+    2: 0,
+    1: 0,
+  });
+  const [trendingData, setTrendingData] = useState({
+    ratingChange: 0,
+    newReviewsThisWeek: 0,
+    responseRate: 0,
+    activeCourses: new Set(),
+  });
   const performanceChartRef = useRef<HTMLCanvasElement>(null);
   const ratingChartRef = useRef<HTMLCanvasElement>(null);
+
+  const calculateMonthlyAverages = useCallback((ratings: FeedbackData[]) => {
+    const monthlyData = ratings.reduce((acc, rating) => {
+      const date = new Date(rating.timestamp.seconds * 1000);
+      const monthYear = date.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
+      if (!acc[monthYear]) {
+        acc[monthYear] = { sum: 0, count: 0 };
+      }
+      acc[monthYear].sum += rating.rating;
+      acc[monthYear].count += 1;
+      return acc;
+    }, {});
+
+    return Object.entries(monthlyData)
+      .map(([month, data]: [string, any]) => ({
+        month,
+        average: (data.sum / data.count).toFixed(1),
+      }))
+      .slice(-6);
+  }, []);
+
+  const initCharts = useCallback(() => {
+    let existingPerformanceChart = Chart.getChart(performanceChartRef.current);
+    let existingRatingChart = Chart.getChart(ratingChartRef.current);
+
+    if (existingPerformanceChart) {
+      existingPerformanceChart.destroy();
+    }
+    if (existingRatingChart) {
+      existingRatingChart.destroy();
+    }
+    if (performanceChartRef.current && ratings.length > 0) {
+      const monthlyAverages = calculateMonthlyAverages(ratings);
+      new Chart(performanceChartRef.current, {
+        type: "line",
+        data: {
+          labels: monthlyAverages.map((item) => item.month),
+          datasets: [
+            {
+              label: "Average Rating",
+              data: monthlyAverages.map((item) => parseFloat(item.average)),
+              borderColor: "#EC4899",
+              backgroundColor: "rgba(236, 72, 153, 0.1)",
+              fill: true,
+              tension: 0.4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false,
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              min: 1,
+              max: 5,
+            },
+          },
+        },
+      });
+    }
+
+    if (ratingChartRef.current) {
+      new Chart(ratingChartRef.current, {
+        type: "bar",
+        data: {
+          labels: ["1★", "2★", "3★", "4★", "5★"],
+          datasets: [
+            {
+              data: [
+                ratingDistribution[1],
+                ratingDistribution[2],
+                ratingDistribution[3],
+                ratingDistribution[4],
+                ratingDistribution[5],
+              ],
+              backgroundColor: [
+                "#FEE2E2",
+                "#FECACA",
+                "#FCA5A5",
+                "#F87171",
+                "#EF4444",
+              ],
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false,
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+              },
+            },
+          },
+        },
+      });
+    }
+  }, [ratings, ratingDistribution, calculateMonthlyAverages]);
 
   const handleLogout = () => {
     try {
@@ -22,43 +164,66 @@ const TeacherDashboard: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    try {
-      const userData = localStorage.getItem("user");
-      const teacherProfile = localStorage.getItem("teacherProfile");
-      const storedProfilePic = localStorage.getItem("profilePic");
+  const calculateTrends = useCallback((ratingsData: FeedbackData[]) => {
+    const now = new Date();
+    const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastMonth = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        const parsedProfile = teacherProfile
-          ? JSON.parse(teacherProfile)
-          : null;
-        setUser({
-          ...parsedUser,
-          ...parsedProfile,
-          initials:
-            parsedUser.displayName
-              ?.split(" ")
-              .map((n: string) => n[0])
-              .join("") || "U",
-        });
+    const currentRatings = ratingsData.filter(
+      (r) => new Date(r.timestamp.seconds * 1000) > lastMonth
+    );
+    const previousRatings = ratingsData.filter((r) => {
+      const date = new Date(r.timestamp.seconds * 1000);
+      return (
+        date <= lastMonth &&
+        date > new Date(lastMonth.getTime() - 30 * 24 * 60 * 60 * 1000)
+      );
+    });
 
-        if (storedProfilePic) {
-          setProfilePic(storedProfilePic);
-        }
+    const currentAvg =
+      currentRatings.reduce((acc, curr) => acc + curr.rating, 0) /
+        currentRatings.length || 0;
+    const previousAvg =
+      previousRatings.reduce((acc, curr) => acc + curr.rating, 0) /
+        previousRatings.length || 0;
 
-        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
-          icon: "👋",
-          duration: 3000,
-          position: "top-center",
-        });
-      }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      toast.error("Failed to load user data");
-    }
+    const newReviews = ratingsData.filter(
+      (r) => new Date(r.timestamp.seconds * 1000) > lastWeek
+    ).length;
 
-    initCharts();
+    const totalResponses = ratingsData.filter((r) => r.teacherResponse).length;
+    const responseRate = (totalResponses / ratingsData.length) * 100 || 0;
+
+    const courses = new Set(ratingsData.map((r) => r.courseId));
+
+    setTrendingData({
+      ratingChange: Number((currentAvg - previousAvg).toFixed(1)),
+      newReviewsThisWeek: newReviews,
+      responseRate: Math.round(responseRate),
+      activeCourses: courses,
+    });
+  }, []);
+
+  const calculateResponseRate = useCallback((feedbackData: FeedbackData[]) => {
+    const totalFeedback = feedbackData.length;
+    if (totalFeedback === 0) return 0;
+
+    const respondedFeedback = feedbackData.filter(
+      (feedback) =>
+        feedback.teacherResponse && feedback.teacherResponse.trim() !== ""
+    ).length;
+
+    return Math.round((respondedFeedback / totalFeedback) * 100);
+  }, []);
+
+  const getLatestFeedback = useCallback((feedbackData: FeedbackData[]) => {
+    return [...feedbackData]
+      .sort((a, b) => b.timestamp.seconds - a.timestamp.seconds)
+      .slice(0, 5)
+      .map((feedback) => ({
+        ...feedback,
+        timeAgo: new Date(feedback.timestamp.seconds * 1000).toLocaleString(),
+      }));
   }, []);
 
   const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,65 +260,263 @@ const TeacherDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const initCharts = () => {
-    if (performanceChartRef.current && ratingChartRef.current) {
-      new Chart(performanceChartRef.current, {
-        type: "line",
-        data: {
-          labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-          datasets: [
-            {
-              label: "My Performance",
-              data: [4.2, 4.3, 4.4, 4.5, 4.5, 4.6],
-              borderColor: "#4f46e5",
-              backgroundColor: "rgba(79, 70, 229, 0.1)",
-              tension: 0.3,
-              fill: true,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false,
-            },
-          },
-        },
+  const fetchRatingsData = async (userId: string) => {
+    try {
+      const ratingsRef = collection(db, "feedback");
+      const cleanUserId = userId.trim();
+      console.log("Cleaned User ID:", cleanUserId);
+
+      const userIdVariations = [
+        cleanUserId,
+        cleanUserId.toLowerCase(),
+        cleanUserId.toUpperCase(),
+        `${cleanUserId} `,
+        `${cleanUserId.toLowerCase()} `,
+        `${cleanUserId.toUpperCase()} `,
+      ];
+
+      const allDocs = await getDocs(collection(db, "feedback"));
+      console.log(
+        "All feedback documents:",
+        allDocs.docs.map((doc) => {
+          const data = doc.data();
+          console.log("Document data:", data);
+          return {
+            id: doc.id,
+            teacherUid: data.teacherUid,
+            ...data,
+          };
+        })
+      );
+
+      const q = query(ratingsRef, where("teacherUid", "in", userIdVariations));
+
+      toast.loading("Loading feedback data...", { id: "feedback-loading" });
+      console.log(
+        "Executing query with teacherUid variations:",
+        userIdVariations
+      );
+
+      const querySnapshot = await getDocs(q);
+      console.log("Query executed, documents found:", querySnapshot.size);
+
+      querySnapshot.forEach((doc) => {
+        console.log("Matching document:", doc.id, doc.data());
       });
 
-      new Chart(ratingChartRef.current, {
-        type: "doughnut",
-        data: {
-          labels: ["5 Stars", "4 Stars", "3 Stars", "2 Stars", "1 Star"],
-          datasets: [
-            {
-              data: [50, 30, 15, 4, 1],
-              backgroundColor: [
-                "#10b981",
-                "#4f46e5",
-                "#f59e0b",
-                "#f97316",
-                "#ef4444",
-              ],
-              borderWidth: 0,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              position: "right",
-            },
+      const ratingsData: FeedbackData[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const normalizedRating = Math.min(Math.max(Number(data.rating), 1), 5);
+
+        ratingsData.push({
+          id: doc.id,
+          ...data,
+          rating: normalizedRating,
+          timestamp: data.timestamp || {
+            seconds: Date.now() / 1000,
+            nanoseconds: 0,
           },
-          cutout: "70%",
-        },
+        } as FeedbackData);
       });
+
+      console.log("Processed ratings data:", ratingsData);
+
+      toast.dismiss("feedback-loading");
+
+      if (ratingsData.length === 0) {
+        if (allDocs.empty) {
+          toast.error("The feedback collection is empty.");
+        } else {
+          toast.error(
+            "No feedback found for this teacher. Please verify the teacher ID and data structure."
+          );
+        }
+        console.log("Expected teacherUid format:", {
+          provided: cleanUserId,
+          lowercase: cleanUserId.toLowerCase(),
+          uppercase: cleanUserId.toUpperCase(),
+        });
+        return;
+      }
+
+      const totalRating = ratingsData.reduce(
+        (acc, curr) => acc + curr.rating,
+        0
+      );
+      const avgRating = Number((totalRating / ratingsData.length).toFixed(1));
+      setAverageRating(avgRating);
+
+      const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+      ratingsData.forEach((rating) => {
+        const ratingKey = Math.min(
+          Math.max(Math.round(rating.rating), 1),
+          5
+        ) as 1 | 2 | 3 | 4 | 5;
+        distribution[ratingKey]++;
+      });
+
+      const sortedRatings = ratingsData.sort((a, b) => {
+        const timestampA = a.timestamp?.seconds || 0;
+        const timestampB = b.timestamp?.seconds || 0;
+        return timestampB - timestampA;
+      });
+
+      setRatingDistribution(distribution);
+      const recentFeedback = sortedRatings.slice(0, 2);
+      console.log("Recent feedback:", recentFeedback);
+      setLatestFeedback(getLatestFeedback(sortedRatings));
+      setRatings(sortedRatings);
+      calculateTrends(sortedRatings);
+
+      setTrendingData((prev) => ({
+        ...prev,
+        responseRate: calculateResponseRate(ratingsData),
+      }));
+
+      toast.success("Data loaded successfully");
+    } catch (error) {
+      console.error("Error fetching ratings:", error);
+      if (error instanceof Error) {
+        const errorMessage = error.message.includes("permission")
+          ? "Access denied. Please make sure you are logged in and have the correct permissions."
+          : "Failed to load ratings data. Please try again later.";
+
+        console.error("Error details:", {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+        });
+
+        toast.error(errorMessage);
+      }
     }
   };
+
+  const downloadReport = () => {
+    try {
+      const reportData = {
+        teacherName: user?.displayName,
+        averageRating,
+        totalReviews: ratings.length,
+        responseRate: trendingData.responseRate,
+        ratingDistribution,
+        feedbackDetails: ratings.map((feedback) => ({
+          courseId: feedback.courseId,
+          rating: feedback.rating,
+          comment: feedback.comment,
+          date: new Date(
+            feedback.timestamp.seconds * 1000
+          ).toLocaleDateString(),
+          responded: !!feedback.teacherResponse,
+        })),
+      };
+
+      const csvContent = [
+        ["Teacher Analytics Report"],
+        ["Generated on:", new Date().toLocaleString()],
+        [""],
+        ["Teacher Name:", reportData.teacherName],
+        ["Average Rating:", reportData.averageRating],
+        ["Total Reviews:", reportData.totalReviews],
+        ["Response Rate:", `${reportData.responseRate}%`],
+        [""],
+        ["Rating Distribution:"],
+        ["5 stars:", ratingDistribution[5]],
+        ["4 stars:", ratingDistribution[4]],
+        ["3 stars:", ratingDistribution[3]],
+        ["2 stars:", ratingDistribution[2]],
+        ["1 star:", ratingDistribution[1]],
+        [""],
+        ["Detailed Feedback:"],
+        ["Course ID", "Rating", "Comment", "Date", "Responded"],
+        ...reportData.feedbackDetails.map((fd) => [
+          fd.courseId,
+          fd.rating,
+          fd.comment,
+          fd.date,
+          fd.responded ? "Yes" : "No",
+        ]),
+      ]
+        .map((row) => row.join(","))
+        .join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `teacher_analytics_${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+      toast.success("Report downloaded successfully");
+    } catch (error) {
+      console.error("Error downloading report:", error);
+      toast.error("Failed to download report");
+    }
+  };
+
+  useEffect(() => {
+    if (ratings.length > 0) {
+      initCharts();
+    }
+
+    return () => {
+      const performanceChart = Chart.getChart(performanceChartRef.current);
+      const ratingChart = Chart.getChart(ratingChartRef.current);
+
+      if (performanceChart) performanceChart.destroy();
+      if (ratingChart) ratingChart.destroy();
+    };
+  }, [ratings, ratingDistribution, initCharts]);
+
+  useEffect(() => {
+    try {
+      const userData = localStorage.getItem("user");
+      const teacherProfile = localStorage.getItem("teacherProfile");
+      const storedProfilePic = localStorage.getItem("profilePic");
+
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        console.log("User data from localStorage:", parsedUser);
+        console.log("User ID to be used:", parsedUser.uid);
+
+        if (!parsedUser.uid) {
+          toast.error("User ID not found");
+          return;
+        }
+
+        const parsedProfile = teacherProfile
+          ? JSON.parse(teacherProfile)
+          : null;
+        setUser({
+          ...parsedUser,
+          ...parsedProfile,
+          initials:
+            parsedUser.displayName
+              ?.split(" ")
+              .map((n: string) => n[0])
+              .join("") || "U",
+        });
+
+        if (storedProfilePic) {
+          setProfilePic(storedProfilePic);
+        }
+
+        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
+          icon: "👋",
+          duration: 3000,
+          position: "top-center",
+        });
+
+        fetchRatingsData(parsedUser.uid);
+      }
+    } catch (error) {
+      console.error("Error in useEffect:", error);
+      toast.error("Failed to initialize dashboard");
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -264,8 +627,8 @@ const TeacherDashboard: React.FC = () => {
                 <svg
                   className="w-4 h-4 mr-2"
                   fill="none"
-                  stroke="currentColor"
                   viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
                   <path
                     strokeLinecap="round"
@@ -280,7 +643,6 @@ const TeacherDashboard: React.FC = () => {
           </div>
         </div>
       </nav>
-
       <main className="max-w-7xl mx-auto px-2 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-4 md:py-8">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4 md:mb-8">
           <div className="mb-4 md:mb-0">
@@ -291,7 +653,10 @@ const TeacherDashboard: React.FC = () => {
               Track your performance and student feedback
             </p>
           </div>
-          <button className="w-full md:w-auto bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors">
+          <button
+            onClick={downloadReport}
+            className="w-full md:w-auto bg-pink-600 text-white px-4 py-2 rounded-lg hover:bg-pink-700 transition-colors"
+          >
             <svg
               className="h-5 w-5 inline-block mr-2"
               fill="none"
@@ -329,7 +694,9 @@ const TeacherDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-2">4.5</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              {averageRating}
+            </div>
             <div className="flex items-center text-green-500 text-sm">
               <svg
                 className="h-5 w-5 mr-1"
@@ -341,10 +708,14 @@ const TeacherDashboard: React.FC = () => {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M5 15l7-7 7 7"
+                  d={
+                    trendingData.ratingChange >= 0
+                      ? "M5 15l7-7 7 7"
+                      : "M19 9l-7 7-7-7"
+                  }
                 />
               </svg>
-              0.2 from last term
+              {Math.abs(trendingData.ratingChange)} from last month
             </div>
           </div>
 
@@ -369,7 +740,9 @@ const TeacherDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-2">128</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              {ratings.length}
+            </div>
             <div className="flex items-center text-green-500 text-sm">
               <svg
                 className="h-5 w-5 mr-1"
@@ -384,7 +757,7 @@ const TeacherDashboard: React.FC = () => {
                   d="M5 15l7-7 7 7"
                 />
               </svg>
-              15 new this week
+              {trendingData.newReviewsThisWeek} new this week
             </div>
           </div>
 
@@ -409,22 +782,11 @@ const TeacherDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-2">92%</div>
-            <div className="flex items-center text-green-500 text-sm">
-              <svg
-                className="h-5 w-5 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 15l7-7 7 7"
-                />
-              </svg>
-              5% from last month
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              89.5% 
+            </div>
+            <div className="flex items-center text-gray-500 text-sm">
+              Based on total feedback
             </div>
           </div>
 
@@ -449,22 +811,11 @@ const TeacherDashboard: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <div className="text-2xl font-bold text-gray-900 mb-2">4</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">
+              {trendingData.activeCourses.size}
+            </div>
             <div className="flex items-center text-gray-500 text-sm">
-              <svg
-                className="h-5 w-5 mr-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-              Same as last term
+              From student feedback
             </div>
           </div>
         </div>
@@ -513,60 +864,47 @@ const TeacherDashboard: React.FC = () => {
               </a>
             </div>
             <div>
-              <div className="border-b pb-4 mb-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                    CS301
-                  </span>
-                  <div className="flex items-center text-yellow-500">
-                    <svg
-                      className="h-5 w-5 mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.036 6.29a1 1 0 00.95.69h6.6c.969 0 1.371 1.24.588 1.81l-5.347 3.89a1 1 0 00-.364 1.118l2.036 6.29c.3.921-.755 1.688-1.54 1.118l-5.347-3.89a1 1 0 00-1.176 0l-5.347 3.89c-.784.57-1.838-.197-1.54-1.118l2.036-6.29a1 1 0 00-.364-1.118L2.414 11.717c-.783-.57-.381-1.81.588-1.81h6.6a1 1 0 00.95-.69l2.036-6.29z"
-                      />
-                    </svg>
-                    <span>4.8</span>
+              {latestFeedback.map((feedback, index) => (
+                <div
+                  key={feedback.id}
+                  className={`${
+                    index !== latestFeedback.length - 1
+                      ? "border-b pb-4 mb-4"
+                      : ""
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                      {feedback.courseId}
+                    </span>
+                    <div className="flex items-center">
+                      <div className="flex items-center text-yellow-400">
+                        {[...Array(5)].map((_, index) => (
+                          <svg
+                            key={index}
+                            className={`h-4 w-4 ${
+                              index < feedback.rating
+                                ? "text-yellow-400"
+                                : "text-gray-300"
+                            }`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8-2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      <span className="ml-1 text-sm text-gray-600">
+                        {feedback.rating.toFixed(1)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <p className="text-sm text-gray-600">
-                  "Excellent teaching methodology and very clear explanations."
-                </p>
-                <span className="text-xs text-gray-400">2 days ago</span>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
-                    CS401
+                  <p className="text-sm text-gray-600">"{feedback.comment}"</p>
+                  <span className="text-xs text-gray-400">
+                    {feedback.timeAgo}
                   </span>
-                  <div className="flex items-center text-yellow-500">
-                    <svg
-                      className="h-5 w-5 mr-1"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l2.036 6.29a1 1 0 00.95.69h6.6c.969 0 1.371 1.24.588 1.81l-5.347 3.89a1 1 0 00-.364 1.118l2.036 6.29c.3.921-.755 1.688-1.54 1.118l-5.347-3.89a1 1 0 00-1.176 0l-5.347 3.89c-.784.57-1.838-.197-1.54-1.118l2.036-6.29a1 1 0 00-.364-1.118L2.414 11.717c-.783-.57-.381-1.81.588-1.81h6.6a1 1 0 00.95-.69l2.036-6.29z"
-                      />
-                    </svg>
-                    <span>4.5</span>
-                  </div>
                 </div>
-                <p className="text-sm text-gray-600">
-                  "Great course structure and engaging assignments."
-                </p>
-                <span className="text-xs text-gray-400">4 days ago</span>
-              </div>
+              ))}
             </div>
           </div>
 

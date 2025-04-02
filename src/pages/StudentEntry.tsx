@@ -188,7 +188,7 @@ const StudentEntry = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="collegeCode">College Code (3-8 letters)</Label>
+              <Label htmlFor="collegeCode">College Code</Label>
               {savedStudentCode && (
                 <div className="text-sm text-gray-500 mb-1">
                   Your college code must start with: {savedStudentCode}
@@ -198,8 +198,8 @@ const StudentEntry = () => {
                 id="collegeCode"
                 placeholder="Enter your college code"
                 value={collegeCode}
-                onChange={(e) => setCollegeCode(e.target.value.slice(0, 8))}
-                maxLength={8}
+                onChange={(e) => setCollegeCode(e.target.value.slice(0, 10))}
+                maxLength={10}
                 className="uppercase"
               />
             </div>

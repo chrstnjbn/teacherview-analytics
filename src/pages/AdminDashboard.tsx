@@ -2,6 +2,16 @@ import type React from "react";
 import { useEffect, useState, useRef } from "react";
 import Chart from "chart.js/auto";
 import toast from "react-hot-toast";
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  Timestamp,
+} from "firebase/firestore";
+import { db } from "../lib/firebase";
 
 interface NavItem {
   icon: string;
@@ -10,9 +20,27 @@ interface NavItem {
 }
 
 interface User {
+  id: string;
   displayName: string;
   photoURL?: string;
   role?: string;
+  department?: string;
+}
+
+interface Student {
+  id: string;
+  name: string;
+  department: string;
+  createdAt: Timestamp;
+}
+
+interface FeedbackData {
+  id: string;
+  studentId: string;
+  teacherId: string;
+  rating: number;
+  comment?: string;
+  createdAt: Timestamp;
 }
 
 const AdminDashboard: React.FC = () => {
@@ -23,39 +51,202 @@ const AdminDashboard: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const performanceChartRef = useRef<Chart | null>(null);
   const ratingChartRef = useRef<Chart | null>(null);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [faculty, setFaculty] = useState<User[]>([]);
+  const [feedbackData, setFeedbackData] = useState<FeedbackData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+
+  const generateMockPerformanceData = () => {
+    const teachers = [
+      { name: "Dr. Priya Mathew", trend: [4.5, 4.7, 4.6, 4.8, 4.9, 4.7] },
+      { name: "Alvin Dennis", trend: [4.3, 4.5, 4.4, 4.6, 4.7, 4.8] },
+      { name: "Christine Jibin", trend: [4.6, 4.8, 4.7, 4.9, 4.8, 4.9] },
+    ];
+
+    const months = new Array(6)
+      .fill(0)
+      .map((_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        return d.toLocaleString("default", { month: "short" });
+      })
+      .reverse();
+
+    return {
+      labels: months,
+      datasets: teachers.map((teacher, index) => ({
+        label: teacher.name,
+        data: teacher.trend,
+        borderColor:
+          index === 0 ? "#4f46e5" : index === 1 ? "#10b981" : "#f59e0b",
+        backgroundColor:
+          index === 0
+            ? "rgba(79, 70, 229, 0.1)"
+            : index === 1
+            ? "rgba(16, 185, 129, 0.1)"
+            : "rgba(245, 158, 11, 0.1)",
+        tension: 0.3,
+        fill: true,
+      })),
+    };
+  };
+
+  const generateMockRatingDistribution = () => {
+    return {
+      labels: ["Dr. Priya Mathew", "Alvin Dennis", "Christine Jibin"],
+      datasets: [
+        {
+          data: [
+            [30, 25, 10, 5, 2], 
+            [28, 22, 12, 4, 1], 
+            [32, 28, 8, 2, 1],
+          ],
+          backgroundColor: [
+            ["#10b981", "#4f46e5", "#f59e0b", "#f97316", "#ef4444"],
+            ["#10b981", "#4f46e5", "#f59e0b", "#f97316", "#ef4444"],
+            ["#10b981", "#4f46e5", "#f59e0b", "#f97316", "#ef4444"],
+          ],
+        },
+      ],
+    };
+  };
 
   useEffect(() => {
-    try {
-      const userData = localStorage.getItem("user");
-      const adminProfile = localStorage.getItem("adminProfile");
-      const storedProfilePic = localStorage.getItem("profilePic");
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
 
-      if (userData) {
-        const parsedUser = JSON.parse(userData);
-        const parsedProfile = adminProfile ? JSON.parse(adminProfile) : null;
-        setUser({
-          ...parsedUser,
-          ...parsedProfile,
-          role: "Administrator",
-        });
-
-        if (storedProfilePic) {
-          setProfilePic(storedProfilePic);
-        }
-
-        toast.success(`Welcome back, ${parsedUser.displayName}!`, {
-          icon: "👋",
-          duration: 3000,
-          position: "top-center",
-        });
+      if (parsedUser?.role !== "admin") {
+        toast.error("Unauthorized access");
+        window.location.href = "/login";
+        return;
       }
-    } catch (error) {
-      console.error("Error loading user data:", error);
-      toast.error("Failed to load user data");
-    }
 
-    initCharts();
+      fetchData();
+    }
   }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+
+      const studentsRef = collection(db, "students");
+      const studentSnap = await getDocs(studentsRef);
+      const studentsData = studentSnap.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() } as Student)
+      );
+      setStudents(studentsData);
+
+      const usersRef = collection(db, "users");
+      const teachersQuery = query(usersRef, where("role", "==", "teacher"));
+      const teachersSnap = await getDocs(teachersQuery);
+      const teachersData = teachersSnap.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() } as User)
+      );
+      setFaculty(teachersData);
+
+      const feedbackRef = collection(db, "feedback");
+      const feedbackQuery = query(
+        feedbackRef,
+        orderBy("createdAt", "desc"),
+        limit(10)
+      );
+      const feedbackSnap = await getDocs(feedbackQuery);
+      const feedbackList = feedbackSnap.docs.map(
+        (doc) => ({ id: doc.id, ...doc.data() } as FeedbackData)
+      );
+      setFeedbackData(feedbackList);
+
+      const mockPerformanceData = generateMockPerformanceData();
+      const mockRatingDistribution = generateMockRatingDistribution();
+
+      if (performanceChartRef.current) {
+        performanceChartRef.current.data.labels = mockPerformanceData.labels;
+        performanceChartRef.current.data.datasets =
+          mockPerformanceData.datasets;
+        performanceChartRef.current.update();
+      }
+
+      if (ratingChartRef.current) {
+        ratingChartRef.current.data.labels = mockRatingDistribution.labels;
+        ratingChartRef.current.data.datasets = mockRatingDistribution.datasets;
+        ratingChartRef.current.update();
+      }
+
+      if (!feedbackData.length) {
+        const mockActivity = [
+          {
+            id: "1",
+            teacherId: faculty[0]?.id || "mock1",
+            rating: 4.5,
+            createdAt: Timestamp.fromDate(new Date()),
+          },
+          {
+            id: "2",
+            teacherId: faculty[1]?.id || "mock2",
+            rating: 5.0,
+            createdAt: Timestamp.fromDate(
+              new Date(Date.now() - 24 * 60 * 60 * 1000)
+            ),
+          },
+          {
+            id: "3",
+            teacherId: faculty[2]?.id || "mock3",
+            rating: 4.8,
+            createdAt: Timestamp.fromDate(
+              new Date(Date.now() - 48 * 60 * 60 * 1000)
+            ),
+          },
+          {
+            id: "4",
+            teacherId: "christine_id",
+            rating: 4.9,
+            createdAt: Timestamp.fromDate(new Date()),
+          },
+        ] as FeedbackData[];
+        setFeedbackData(mockActivity);
+      }
+
+      setLoading(false);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to fetch dashboard data");
+      setLoading(false);
+    }
+  };
+
+  const processChartData = (feedback: FeedbackData[]) => {
+    if (feedback.length === 0) {
+      const mockData = generateMockPerformanceData();
+      return {
+        labels: mockData.labels,
+        ratings: mockData.datasets.map((d) => d.data),
+      };
+    }
+    const months = new Array(6)
+      .fill(0)
+      .map((_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        return d.toLocaleString("default", { month: "short" });
+      })
+      .reverse();
+
+    return {
+      labels: months,
+      ratings: months.map(() => 0),
+    };
+  };
 
   const handleProfilePicChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,6 +282,49 @@ const AdminDashboard: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
+  const generateReport = async () => {
+    try {
+      toast.loading("Generating report...");
+
+      const reportData = {
+        totalStudents: students.length,
+        totalFaculty: faculty.length,
+        averageRating:
+          feedbackData.length > 0
+            ? (
+                feedbackData.reduce((acc, curr) => acc + curr.rating, 0) /
+                feedbackData.length
+              ).toFixed(1)
+            : "N/A",
+        departmentCount: new Set(students.map((s) => s.department)).size,
+        topPerformers: faculty.slice(0, 5),
+        recentFeedback: feedbackData.slice(0, 10),
+        generatedAt: new Date().toISOString(),
+      };
+
+      const blob = new Blob([JSON.stringify(reportData, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `performance-report-${
+        new Date().toISOString().split("T")[0]
+      }.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.dismiss();
+      toast.success("Report generated successfully");
+    } catch (error) {
+      console.error("Report generation error:", error);
+      toast.dismiss();
+      toast.error("Failed to generate report");
+    }
+  };
+
   const initCharts = () => {
     const performanceCtx = document.getElementById(
       "performanceChart"
@@ -100,35 +334,17 @@ const AdminDashboard: React.FC = () => {
     ) as HTMLCanvasElement;
 
     if (performanceCtx && ratingCtx) {
-      if (performanceChartRef.current) {
-        performanceChartRef.current.destroy();
-      }
-      if (ratingChartRef.current) {
-        ratingChartRef.current.destroy();
-      }
+      if (performanceChartRef.current) performanceChartRef.current.destroy();
+      if (ratingChartRef.current) ratingChartRef.current.destroy();
+
+      const mockPerformanceData = generateMockPerformanceData();
+      const mockRatingData = generateMockRatingDistribution();
 
       performanceChartRef.current = new Chart(performanceCtx, {
         type: "line",
         data: {
-          labels: ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-          datasets: [
-            {
-              label: "Computer Science",
-              data: [3.8, 4.0, 4.2, 4.3, 4.5, 4.4],
-              borderColor: "#4f46e5",
-              backgroundColor: "rgba(79, 70, 229, 0.1)",
-              tension: 0.3,
-              fill: true,
-            },
-            {
-              label: "Mathematics",
-              data: [3.5, 3.7, 3.9, 4.0, 4.1, 4.0],
-              borderColor: "#f97316",
-              backgroundColor: "rgba(249, 115, 22, 0.1)",
-              tension: 0.3,
-              fill: true,
-            },
-          ],
+          labels: mockPerformanceData.labels,
+          datasets: mockPerformanceData.datasets,
         },
         options: {
           responsive: true,
@@ -136,42 +352,80 @@ const AdminDashboard: React.FC = () => {
           plugins: {
             legend: {
               position: "top",
+              labels: {
+                usePointStyle: true,
+                pointStyle: "circle",
+              },
+            },
+            tooltip: {
+              mode: "index",
+              intersect: false,
+              callbacks: {
+                title: (context) => `Performance - ${context[0].label}`,
+                label: (context) =>
+                  `${context.dataset.label}: ${context.parsed.y.toFixed(1)} ⭐`,
+              },
+            },
+          },
+          scales: {
+            y: {
+              min: 0,
+              max: 5,
+              ticks: {
+                stepSize: 1,
+                callback: (value) => `${value} ⭐`,
+              },
             },
           },
         },
       });
 
       ratingChartRef.current = new Chart(ratingCtx, {
-        type: "doughnut",
+        type: "bar",
         data: {
-          labels: ["5 Stars", "4 Stars", "3 Stars", "2 Stars", "1 Star"],
-          datasets: [
-            {
-              data: [45, 30, 15, 7, 3],
-              backgroundColor: [
-                "#10b981",
-                "#4f46e5",
-                "#f59e0b",
-                "#f97316",
-                "#ef4444",
-              ],
-              borderWidth: 0,
-            },
-          ],
+          labels: ["5 ⭐", "4 ⭐", "3 ⭐", "2 ⭐", "1 ⭐"],
+          datasets: mockRatingData.labels.map((name, idx) => ({
+            label: name,
+            data: mockRatingData.datasets[0].data[idx],
+            backgroundColor: mockRatingData.datasets[0].backgroundColor[idx],
+            borderRadius: 4,
+          })),
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: "right",
+              position: "top",
+              labels: {
+                usePointStyle: true,
+                pointStyle: "circle",
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label: (context) =>
+                  `${context.dataset.label}: ${context.parsed.y} ratings`,
+              },
             },
           },
-          cutout: "70%",
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: "Number of Ratings",
+              },
+            },
+          },
         },
       });
     }
   };
+
+  useEffect(() => {
+    initCharts();
+  }, [feedbackData]);
 
   useEffect(() => {
     return () => {
@@ -394,6 +648,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             <button
               type="button"
+              onClick={generateReport}
               className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
               Generate Report
@@ -410,10 +665,12 @@ const AdminDashboard: React.FC = () => {
                   <i className="fas fa-users text-indigo-600" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">1,248</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading ? "..." : students.length}
+              </div>
               <div className="flex items-center text-green-500 text-sm">
                 <i className="fas fa-arrow-up mr-1" />
-                12% from last month
+                {loading ? "..." : `${students.length} total`}
               </div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -425,9 +682,12 @@ const AdminDashboard: React.FC = () => {
                   <i className="fas fa-chalkboard-teacher text-indigo-600" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">86</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading ? "..." : faculty.length}
+              </div>
               <div className="flex items-center text-green-500 text-sm">
-                <i className="fas fa-arrow-up mr-1" /> 4 new additions
+                <i className="fas fa-arrow-up mr-1" />{" "}
+                {loading ? "..." : "4 new additions"}
               </div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -439,9 +699,23 @@ const AdminDashboard: React.FC = () => {
                   <i className="fas fa-star text-indigo-600" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">4.2</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading
+                  ? "..."
+                  : feedbackData.length > 0
+                  ? (
+                      feedbackData.reduce((acc, curr) => acc + curr.rating, 0) /
+                      feedbackData.length
+                    ).toFixed(1)
+                  : "4.2"}
+              </div>
               <div className="flex items-center text-green-500 text-sm">
-                <i className="fas fa-arrow-up mr-1" /> 0.3 increase
+                <i className="fas fa-arrow-up mr-1" />{" "}
+                {loading
+                  ? "..."
+                  : feedbackData.length > 0
+                  ? "0.3 increase"
+                  : "No data"}
               </div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">
@@ -453,7 +727,11 @@ const AdminDashboard: React.FC = () => {
                   <i className="fas fa-building text-indigo-600" />
                 </div>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-2">12</div>
+              <div className="text-2xl font-bold text-gray-900 mb-2">
+                {loading
+                  ? "..."
+                  : new Set(students.map((s) => s.department)).size}
+              </div>
               <div className="flex items-center text-gray-500 text-sm">
                 <i className="fas fa-minus mr-1" /> No change
               </div>
@@ -506,48 +784,84 @@ const AdminDashboard: React.FC = () => {
                 </a>
               </div>
               <div className="space-y-4">
-                <div className="flex items-center">
-                  <div className="bg-indigo-100 p-3 rounded-lg">
-                    <i className="fas fa-comment text-indigo-600" />
+                {loading ? (
+                  <div className="text-center py-4 text-gray-500">
+                    Loading activities...
                   </div>
-                  <div className="ml-4">
-                    <h4 className="text-sm font-semibold text-gray-800">
-                      New Faculty Reviews
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      Dr. Smith received 5 new student reviews
-                    </p>
-                    <span className="text-xs text-gray-500">2 hours ago</span>
+                ) : feedbackData.length > 0 ? (
+                  shuffleArray(feedbackData).slice(0, 5).map((feedback) => {
+                    const teacher = faculty.find(
+                      (t) => t.id === feedback.teacherId
+                    );
+                    const feedbackDate = feedback.createdAt?.toDate() || new Date();
+                    const timeAgo = Math.floor((Date.now() - feedbackDate.getTime()) / (1000 * 60));
+                    
+                    let timeString = '';
+                    if (timeAgo < 60) {
+                      timeString = `${timeAgo} minutes ago`;
+                    } else if (timeAgo < 1440) {
+                      timeString = `${Math.floor(timeAgo / 60)} hours ago`;
+                    } else {
+                      timeString = feedbackDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      });
+                    }
+
+                    return (
+                      <div
+                        key={feedback.id}
+                        className="flex items-center p-3 hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        <div className="bg-indigo-100 p-3 rounded-lg">
+                          <i className="fas fa-comment text-indigo-600" />
+                        </div>
+                        <div className="ml-4 flex-1">
+                          <h4 className="text-sm font-semibold text-gray-800">
+                            New Feedback for {" "}
+                            {teacher?.displayName ||
+                              (feedback.teacherId === "christine_id"
+                                ? "Christine Jibin"
+                                : feedback.teacherId === "mock2"
+                                ? "Alvin Dennis"
+                                : "Dr. Priya Mathew")}
+                          </h4>
+                          <div className="flex items-center space-x-2">
+                            <div className="flex">
+                              {[...Array(5)].map((_, index) => (
+                                <i
+                                  key={index}
+                                  className={`fas fa-star text-xs ${
+                                    index < feedback.rating
+                                      ? "text-yellow-400"
+                                      : "text-gray-300"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {feedback.rating.toFixed(1)} rating
+                            </p>
+                            {feedback.comment && (
+                              <span className="text-xs text-gray-500 italic">
+                                "{feedback.comment}"
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            {timeString}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-gray-500">
+                    No recent feedback available
                   </div>
-                </div>
-                <div className="flex items-center">
-                  <div className="bg-red-100 p-3 rounded-lg">
-                    <i className="fas fa-exclamation-triangle text-red-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h4 className="text-sm font-semibold text-gray-800">
-                      Performance Alert
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      CS101 course ratings below threshold
-                    </p>
-                    <span className="text-xs text-gray-500">5 hours ago</span>
-                  </div>
-                </div>
-                <div className="flex items-center">
-                  <div className="bg-yellow-100 p-3 rounded-lg">
-                    <i className="fas fa-file-alt text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h4 className="text-sm font-semibold text-gray-800">
-                      Monthly Report Generated
-                    </h4>
-                    <p className="text-sm text-gray-600">
-                      May 2023 performance report is ready
-                    </p>
-                    <span className="text-xs text-gray-500">1 day ago</span>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
             <div className="bg-white rounded-lg shadow p-6">

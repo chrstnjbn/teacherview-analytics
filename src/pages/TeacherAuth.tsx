@@ -144,8 +144,8 @@ const TeacherAuth = () => {
                   id="collegeCode"
                   placeholder="Enter college code"
                   value={collegeCode}
-                  onChange={(e) => setCollegeCode(e.target.value.slice(0, 8))}
-                  maxLength={8}
+                  onChange={(e) => setCollegeCode(e.target.value.slice(0, 10))}
+                  maxLength={10}
                   className="uppercase"
                 />
               </div>
