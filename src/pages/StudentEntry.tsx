@@ -41,10 +41,8 @@ const StudentEntry = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (name.trim() && semester && collegeCode.trim()) {
-      const enteredCodePrefix = collegeCode
-        .trim()
-        .substring(0, 3)
-        .toUpperCase();
+      const fullCollegeCode = collegeCode.trim().toUpperCase();
+      const enteredCodePrefix = fullCollegeCode.substring(0, 3);
 
       if (!savedStudentCode || enteredCodePrefix === savedStudentCode) {
         try {
@@ -74,7 +72,8 @@ const StudentEntry = () => {
           await setDoc(userDocRef, {
             role: ROLES.STUDENT,
             displayName: name.trim(),
-            collegeCode: collegeCode.trim().toUpperCase(),
+            collegeCode: enteredCodePrefix,
+            fullCollegeCode: fullCollegeCode,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             isAnonymous: true,
@@ -85,7 +84,8 @@ const StudentEntry = () => {
           const studentData = {
             name: name.trim(),
             semester: semester,
-            collegeCode: collegeCode.trim().toUpperCase(),
+            collegeCode: enteredCodePrefix,
+            fullCollegeCode: fullCollegeCode,
             createdAt: serverTimestamp(),
             userId: authUser.uid,
             role: ROLES.STUDENT,
@@ -99,7 +99,8 @@ const StudentEntry = () => {
           const sessionData = {
             studentName: name.trim(),
             studentSemester: semester,
-            studentCollegeCode: collegeCode.trim().toUpperCase(),
+            studentCollegeCode: enteredCodePrefix,
+            studentFullCollegeCode: fullCollegeCode,
             studentId: docRef.id,
           };
 
