@@ -92,7 +92,7 @@ const AdminDashboard: React.FC = () => {
 
   const generateMockPerformanceData = () => {
     const teachers = [
-      { name: "Dr. Priya Mathew", trend: [4.5, 4.7, 4.6, 4.8, 4.9, 4.7] },
+      { name: "Priya Iype", trend: [4.5, 4.7, 4.6, 4.8, 4.9, 4.7] },
       { name: "Alvin Dennis", trend: [4.3, 4.5, 4.4, 4.6, 4.7, 4.8] },
       { name: "Christine Jibin", trend: [4.6, 4.8, 4.7, 4.9, 4.8, 4.9] },
     ];
@@ -127,7 +127,7 @@ const AdminDashboard: React.FC = () => {
 
   const generateMockRatingDistribution = () => {
     return {
-      labels: ["Dr. Priya Mathew", "Alvin Dennis", "Christine Jibin"],
+      labels: ["Priya Iype", "Alvin Dennis", "Christine Jibin"],
       datasets: [
         {
           data: [
@@ -217,11 +217,10 @@ const AdminDashboard: React.FC = () => {
       }));
       setStudents(mockStudents);
 
-      // Mock data for faculty
       const mockFaculty = [
         {
           id: "faculty_1",
-          displayName: "Dr. Priya Mathew",
+          displayName: "Priya Iype",
           role: "teacher",
           department: "CSE",
         },
@@ -237,7 +236,6 @@ const AdminDashboard: React.FC = () => {
           role: "teacher",
           department: "IT",
         },
-        // Add more mock faculty as needed
       ];
       setFaculty(mockFaculty);
 
