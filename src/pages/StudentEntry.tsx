@@ -35,10 +35,7 @@ const StudentEntry = () => {
   const { setUserRole, currentUser } = useAuth();
 
   useEffect(() => {
-    const storedStudentCode = localStorage.getItem("collegeStudentCode");
-    if (storedStudentCode) {
-      setSavedStudentCode(storedStudentCode);
-    }
+    setSavedStudentCode("VIT");
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +135,7 @@ const StudentEntry = () => {
       } else {
         toast({
           title: "Invalid College Code",
-          description: `Your college code should start with ${savedStudentCode}`,
+          description: `Your college code should start with VIT`,
           variant: "destructive",
         });
       }
@@ -191,7 +188,7 @@ const StudentEntry = () => {
               <Label htmlFor="collegeCode">College Code</Label>
               {savedStudentCode && (
                 <div className="text-sm text-gray-500 mb-1">
-                  Your college code must start with: {savedStudentCode}
+                  Your college code must start with: VIT
                 </div>
               )}
               <Input

@@ -191,9 +191,7 @@ export const SignInForm = ({
     <div className="w-full max-w-md mx-auto space-y-6">
       <AuthHeader
         title={isAdminRoute ? "Administrator Access" : "Faculty Portal"}
-        subtitle={`Welcome back to ${
-          savedStaffCode || "your institution"
-        }'s portal`}
+        subtitle={`Welcome back to VIT's portal`}
         isLoading={isLoading}
       />
 
